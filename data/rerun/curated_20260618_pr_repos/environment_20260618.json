@@ -1,0 +1,113 @@
+{
+  "captured_at": "2026-06-18T10:25:56+08:00",
+  "note": "Captured immediately after the curated rerun on the same host. The vLLM server logs show the benchmark process used CUDA_VISIBLE_DEVICES=0.",
+  "host": {
+    "os": "Ubuntu 22.04.5 LTS",
+    "kernel": "Linux 5.15.0-181-generic x86_64 GNU/Linux",
+    "platform": "Linux-5.15.0-181-generic-x86_64-with-glibc2.35"
+  },
+  "gpu": {
+    "benchmark_visible_device": "0",
+    "driver_version": "580.126.09",
+    "nvidia_smi_cuda_version": "13.0",
+    "devices": [
+      {
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 4090",
+        "uuid": "GPU-263675c4-449e-e97c-50e9-60e8a427c254",
+        "pci_bus_id": "00000000:31:00.0",
+        "memory_total_mib": 24564,
+        "power_limit_w": 450.0,
+        "used_for_benchmark": true
+      },
+      {
+        "index": 1,
+        "name": "NVIDIA GeForce RTX 4090",
+        "uuid": "GPU-6b7b5248-c07b-239a-e00d-fbc55798d7c7",
+        "pci_bus_id": "00000000:B1:00.0",
+        "memory_total_mib": 24564,
+        "power_limit_w": 450.0,
+        "used_for_benchmark": false
+      }
+    ]
+  },
+  "python": {
+    "executable": "<PYTHON_BIN>",
+    "version": "3.12.11 (main, Jul 11 2025, 22:43:48) [Clang 20.1.4]"
+  },
+  "packages": {
+    "torch": "2.11.0+cu128",
+    "torchvision": "0.26.0+cu128",
+    "torch_cuda": "12.8",
+    "torch_cudnn": "91900",
+    "transformers": "5.12.1",
+    "vllm": "0.1.dev17674+gec36b4a1c.precompiled",
+    "triton": "3.6.0",
+    "flashinfer-python": "0.6.12",
+    "pillow": "12.2.0",
+    "openai": "2.41.1",
+    "numpy": "2.3.5"
+  },
+  "vllm_runtime": {
+    "model_runner": "V2 Model Runner",
+    "attention_backend": "TRITON_ATTN",
+    "dtype": "bfloat16",
+    "device_config": "cuda",
+    "tensor_parallel_size": 1,
+    "pipeline_parallel_size": 1,
+    "data_parallel_size": 1,
+    "max_model_len": 4096,
+    "max_num_batched_tokens": 4096,
+    "max_num_seqs": 4,
+    "gpu_memory_utilization": 0.8,
+    "enable_prefix_caching": true,
+    "enable_chunked_prefill": true,
+    "cudagraph_mode": "FULL_AND_PIECEWISE",
+    "cudagraph_capture_sizes": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      24,
+      32,
+      40,
+      48,
+      56,
+      64,
+      72,
+      80,
+      88,
+      96,
+      104,
+      112,
+      120,
+      128,
+      136,
+      144,
+      152,
+      160,
+      168,
+      176,
+      184,
+      192,
+      200,
+      208,
+      216,
+      224,
+      232,
+      240,
+      248,
+      256
+    ],
+    "server_args": {
+      "host": "127.0.0.1",
+      "port": 18100,
+      "served_model_name": "mineru-diffusion",
+      "trust_remote_code": true,
+      "allowed_local_media_path": "/",
+      "disable_uvicorn_access_log": true,
+      "enable_logging_iteration_details": true
+    }
+  }
+}

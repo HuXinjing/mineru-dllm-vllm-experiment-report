@@ -1,0 +1,93 @@
+{
+  "metrics": {
+    "layout_elapsed": 0.9629874100210145,
+    "extract_elapsed": 0.7513033720897511,
+    "total_elapsed": 1.8157521389657632,
+    "num_blocks": 7,
+    "num_extracted_blocks": 6,
+    "markdown_chars": 743,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>210 157 400 391<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>211 405 398 421<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>113 460 491 507<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>115 508 497 582<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>627 365 797 382<|box_end|><|ref_start|>table_caption<|ref_end|><|rotate_up|>\n<|box_start|>581 384 669 645<|box_end|><|ref_start|>table<|ref_end|><|rotate_up|>\n<|box_start|>494 877 504 888<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "Figure 1:Figure Caption\n\n\\[\nC (p, \\bar {p}) \\leftarrow \\frac {(1 - \\lambda) \\cdot C (p , \\bar {p}) + \\lambda \\cdot w _ {t} (p , p _ {t - 1}) \\cdot C _ {a} (p , \\bar {p})}{(1 - \\lambda) + \\lambda \\cdot w _ {t} (p , p _ {t - 1})} \\tag {1}\n\\]\n\nTrump graduated from the Wharton School of the. University of Pennsylvania with a bachelor's degree in 1968. He became president of his father's real estate business in 1971 and renamed it The Trump Organization.\n\nTable 1: Table Caption\n\n<table><tr><td>Model</td><td>R2</td><td>Testing Error</td></tr><tr><td>Linear Regression</td><td>0.98740</td><td>1321.2</td></tr><tr><td>Linear Regression</td><td>0.98740</td><td>1321.2</td></tr><tr><td>Gray Prediction</td><td>0.00017</td><td>687</td></tr></table>",
+  "blocks": [
+    {
+      "type": "image",
+      "bbox": [
+        0.21,
+        0.157,
+        0.4,
+        0.391
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.211,
+        0.405,
+        0.398,
+        0.421
+      ],
+      "angle": 0,
+      "content": "Figure 1:Figure Caption"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.113,
+        0.46,
+        0.491,
+        0.507
+      ],
+      "angle": 0,
+      "content": "\\[\nC (p, \\bar {p}) \\leftarrow \\frac {(1 - \\lambda) \\cdot C (p , \\bar {p}) + \\lambda \\cdot w _ {t} (p , p _ {t - 1}) \\cdot C _ {a} (p , \\bar {p})}{(1 - \\lambda) + \\lambda \\cdot w _ {t} (p , p _ {t - 1})} \\tag {1}\n\\]"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.115,
+        0.508,
+        0.497,
+        0.582
+      ],
+      "angle": 0,
+      "content": "Trump graduated from the Wharton School of the. University of Pennsylvania with a bachelor's degree in 1968. He became president of his father's real estate business in 1971 and renamed it The Trump Organization."
+    },
+    {
+      "type": "table_caption",
+      "bbox": [
+        0.627,
+        0.365,
+        0.797,
+        0.382
+      ],
+      "angle": 0,
+      "content": "Table 1: Table Caption"
+    },
+    {
+      "type": "table",
+      "bbox": [
+        0.581,
+        0.384,
+        0.669,
+        0.645
+      ],
+      "angle": 0,
+      "content": "<table><tr><td>Model</td><td>R2</td><td>Testing Error</td></tr><tr><td>Linear Regression</td><td>0.98740</td><td>1321.2</td></tr><tr><td>Linear Regression</td><td>0.98740</td><td>1321.2</td></tr><tr><td>Gray Prediction</td><td>0.00017</td><td>687</td></tr></table>"
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.494,
+        0.877,
+        0.504,
+        0.888
+      ],
+      "angle": 0,
+      "content": "1"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_unit_test_p0001/markdown_1781747531.md"
+}

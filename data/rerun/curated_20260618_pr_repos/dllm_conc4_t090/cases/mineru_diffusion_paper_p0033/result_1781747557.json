@@ -1,0 +1,126 @@
+{
+  "metrics": {
+    "layout_elapsed": 1.2955699970480055,
+    "extract_elapsed": 0.7984240169171244,
+    "total_elapsed": 2.2229505860013887,
+    "num_blocks": 10,
+    "num_extracted_blocks": 8,
+    "markdown_chars": 565,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>136 078 835 093<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>427 192 571 208<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>273 294 352 312<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>141 316 486 345<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>141 353 486 736<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>647 303 728 319<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>515 324 858 355<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>514 371 862 728<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>265 826 733 842<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>490 938 508 951<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "Formula Decoding\n\nExample 1\n\n\\[\n\\psi_ {R} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ i \\left(\\chi + \\frac {\\chi}{2}\\right) \\right], \\quad \\psi_ {L} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ - i \\left(\\chi - \\frac {\\chi}{2}\\right) \\right]\n\\]\n\nExample 2\n\n\\[\n\\boxed {\\Gamma_ {k} \\left[ g, \\bar {g} \\right] = \\left(1 6 \\pi G \\left(k\\right)\\right) ^ {- 1} \\int d ^ {4} x \\sqrt {g} \\left\\{- R \\left(g\\right) + 2 \\bar {\\lambda} \\left(k\\right) \\right\\} + S _ {g f} \\left[ g, \\bar {g} \\right]}\n\\]\n\nFigure 18: Diffusion decoding examples for formula recognition.",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.136,
+        0.078,
+        0.835,
+        0.093
+      ],
+      "angle": 0,
+      "content": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion Decoding"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.427,
+        0.192,
+        0.571,
+        0.208
+      ],
+      "angle": 0,
+      "content": "Formula Decoding"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.273,
+        0.294,
+        0.352,
+        0.312
+      ],
+      "angle": 0,
+      "content": "Example 1"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.141,
+        0.316,
+        0.486,
+        0.345
+      ],
+      "angle": 0,
+      "content": "\\[\n\\psi_ {R} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ i \\left(\\chi + \\frac {\\chi}{2}\\right) \\right], \\quad \\psi_ {L} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ - i \\left(\\chi - \\frac {\\chi}{2}\\right) \\right]\n\\]"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.141,
+        0.353,
+        0.486,
+        0.736
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.647,
+        0.303,
+        0.728,
+        0.319
+      ],
+      "angle": 0,
+      "content": "Example 2"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.515,
+        0.324,
+        0.858,
+        0.355
+      ],
+      "angle": 0,
+      "content": "\\[\n\\boxed {\\Gamma_ {k} \\left[ g, \\bar {g} \\right] = \\left(1 6 \\pi G \\left(k\\right)\\right) ^ {- 1} \\int d ^ {4} x \\sqrt {g} \\left\\{- R \\left(g\\right) + 2 \\bar {\\lambda} \\left(k\\right) \\right\\} + S _ {g f} \\left[ g, \\bar {g} \\right]}\n\\]"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.514,
+        0.371,
+        0.862,
+        0.728
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.265,
+        0.826,
+        0.733,
+        0.842
+      ],
+      "angle": 0,
+      "content": "Figure 18: Diffusion decoding examples for formula recognition."
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.49,
+        0.938,
+        0.508,
+        0.951
+      ],
+      "angle": 0,
+      "content": "33"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_diffusion_paper_p0033/markdown_1781747557.md"
+}

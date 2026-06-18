@@ -1,0 +1,137 @@
+{
+  "metrics": {
+    "layout_elapsed": 1.2981247910065576,
+    "extract_elapsed": 1.7979662850266322,
+    "total_elapsed": 3.31046705506742,
+    "num_blocks": 11,
+    "num_extracted_blocks": 11,
+    "markdown_chars": 481,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>374 093 560 111<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>782 093 809 110<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>\n<|box_start|>097 134 823 185<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>097 192 834 303<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>097 308 834 506<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>097 514 834 654<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>152 660 832 681<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>097 703 828 743<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>\n<|box_start|>332 747 421 764<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>\n<|box_start|>331 767 593 785<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>\n<|box_start|>096 815 828 857<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>",
+  "markdown": "内在的交换价值似乎是经院哲学家所说的形容语的矛盾①。(7)现在我们进一步考察这个问题。\n\n某种特殊的商品，例如一夸特小麦，按各种极不相同的比例同别的商品交换。但是，它的交换价值，无论采用何种表现方式，x量鞋油、y量绸缎、z量金等等，都是不变的。因此，它必定有一种与这些不同的表现相区别的内容。\n\n我们再拿两种商品例如小麦和铁来说。不管二者的交换比例怎样，总是可以用一个等式来表示：一定量的小麦等于若干量的铁，如1夸特小麦=a'公斤铁。这个等式说明什么呢？它说明在两种不同的物里面，即在1夸特小麦和'公斤铁里面，有一种共同的东西。因而这二者都等于第三种东西，后者本身既不是第一种物，也不是第二种物。这二者中的每一个作为交换价值，都必定能不依赖另一个而化为第三种东西。\n\n用一个初级几何的例子就可以说明这一点。为了测量和比较各种直线形的面积，就把它们分成三角形，再把三角形化成与它的外形完全不同的表现——底乘高的一半。各种商品的交换价值也同样要化成一种对它们来说是共同的东西，各自代表这种共同东西的多量或少量。\n\n这种共同东西不可能是商品的某种天然属性，几何的、物理",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.374,
+        0.093,
+        0.56,
+        0.111
+      ],
+      "angle": 0,
+      "content": "第一章 商 品"
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.782,
+        0.093,
+        0.809,
+        0.11
+      ],
+      "angle": 0,
+      "content": "13"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.097,
+        0.134,
+        0.823,
+        0.185
+      ],
+      "angle": 0,
+      "content": "内在的交换价值似乎是经院哲学家所说的形容语的矛盾①。(7)现在我们进一步考察这个问题。"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.097,
+        0.192,
+        0.834,
+        0.303
+      ],
+      "angle": 0,
+      "content": "某种特殊的商品，例如一夸特小麦，按各种极不相同的比例同别的商品交换。但是，它的交换价值，无论采用何种表现方式，x量鞋油、y量绸缎、z量金等等，都是不变的。因此，它必定有一种与这些不同的表现相区别的内容。"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.097,
+        0.308,
+        0.834,
+        0.506
+      ],
+      "angle": 0,
+      "content": "我们再拿两种商品例如小麦和铁来说。不管二者的交换比例怎样，总是可以用一个等式来表示：一定量的小麦等于若干量的铁，如1夸特小麦=a'公斤铁。这个等式说明什么呢？它说明在两种不同的物里面，即在1夸特小麦和'公斤铁里面，有一种共同的东西。因而这二者都等于第三种东西，后者本身既不是第一种物，也不是第二种物。这二者中的每一个作为交换价值，都必定能不依赖另一个而化为第三种东西。"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.097,
+        0.514,
+        0.834,
+        0.654
+      ],
+      "angle": 0,
+      "content": "用一个初级几何的例子就可以说明这一点。为了测量和比较各种直线形的面积，就把它们分成三角形，再把三角形化成与它的外形完全不同的表现——底乘高的一半。各种商品的交换价值也同样要化成一种对它们来说是共同的东西，各自代表这种共同东西的多量或少量。"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.152,
+        0.66,
+        0.832,
+        0.681
+      ],
+      "angle": 0,
+      "content": "这种共同东西不可能是商品的某种天然属性，几何的、物理"
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.097,
+        0.703,
+        0.828,
+        0.743
+      ],
+      "angle": 0,
+      "content": "（7）“任何东西部不可能有内在的交换价值。”（尼·巴尔本《新币轻铸论。答洛克先生关于提高货币价值的意见》第16页）；或者象巴特勒所说："
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.332,
+        0.747,
+        0.421,
+        0.764
+      ],
+      "angle": 0,
+      "content": "“物的价值"
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.331,
+        0.767,
+        0.593,
+        0.785
+      ],
+      "angle": 0,
+      "content": "正好和它会换来的东西相等。”"
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.096,
+        0.815,
+        0.828,
+        0.857
+      ],
+      "angle": 0,
+      "content": "(1) 形容语的矛盾的原文是《contradictio inmisco》，指“圆形的方”，“木制的铁”一类的矛盾。——译者注"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_small_ocr_p0002/markdown_1781747526.md"
+}

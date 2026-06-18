@@ -1,0 +1,3966 @@
+From 7f6e10e357a46f05572184b53745bf457ccf09e9 Mon Sep 17 00:00:00 2001
+From: HuXinjing <49928618+HuXinjing@users.noreply.github.com>
+Date: Thu, 18 Jun 2026 09:38:12 +0800
+Subject: [PATCH] feat(model): add experimental MinerU-Diffusion support
+
+---
+ .../models/test_mineru_diffusion.py           | 1116 ++++++++++
+ tests/models/registry.py                      |    5 +
+ .../gpu/test_model_runner_v2_mineru_logits.py |   60 +
+ .../test_model_runner_v2_profile_scopes.py    |   22 +
+ vllm/config/model.py                          |    4 +-
+ vllm/model_executor/models/config.py          |   38 +
+ .../model_executor/models/mineru_diffusion.py | 1887 +++++++++++++++++
+ vllm/model_executor/models/registry.py        |    4 +
+ vllm/transformers_utils/config.py             |    2 +
+ vllm/transformers_utils/configs/__init__.py   |    4 +
+ .../configs/mineru_diffusion.py               |  169 ++
+ vllm/v1/worker/gpu/model_runner.py            |  325 +--
+ vllm/v1/worker/gpu/model_states/interface.py  |   14 +
+ vllm/v1/worker/gpu/warmup.py                  |    2 +
+ vllm/v1/worker/gpu_model_runner.py            |    2 +-
+ 15 files changed, 3522 insertions(+), 132 deletions(-)
+ create mode 100644 tests/model_executor/models/test_mineru_diffusion.py
+ create mode 100644 tests/v1/worker/gpu/test_model_runner_v2_mineru_logits.py
+ create mode 100644 tests/v1/worker/gpu/test_model_runner_v2_profile_scopes.py
+ create mode 100644 vllm/model_executor/models/mineru_diffusion.py
+ create mode 100644 vllm/transformers_utils/configs/mineru_diffusion.py
+
+diff --git a/tests/model_executor/models/test_mineru_diffusion.py b/tests/model_executor/models/test_mineru_diffusion.py
+new file mode 100644
+index 000000000..71def05f3
+--- /dev/null
++++ b/tests/model_executor/models/test_mineru_diffusion.py
+@@ -0,0 +1,1116 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++import inspect
++import json
++from types import SimpleNamespace
++
++import numpy as np
++import pytest
++import torch
++from transformers.models.qwen2_vl.configuration_qwen2_vl import Qwen2VLVisionConfig
++
++from vllm.config import (
++    AttentionConfig,
++    CUDAGraphMode,
++    CacheConfig,
++    CompilationConfig,
++    ModelConfig,
++)
++from vllm.config import DiffusionConfig
++from vllm.config import KVTransferConfig
++from vllm.config import set_current_vllm_config
++from vllm.model_executor.layers.attention import Attention
++from vllm.model_executor.models.mineru_diffusion import (
++    MinerUDiffusionForConditionalGeneration,
++    MinerUDiffusionModelState,
++    MinerUDiffusionRequestStates,
++    MinerUDiffusionSampler,
++    SDARForCausalLM,
++    get_num_transfer_tokens,
++    sample_with_temperature_topk_topp,
++    select_transfer_indices,
++)
++from vllm.v1.worker.gpu.model_states.interface import ModelState
++from vllm.transformers_utils.configs.mineru_diffusion import MinerUDiffusionConfig
++
++
++def test_mineru_diffusion_config_defaults():
++    config = MinerUDiffusionConfig()
++
++    assert config.model_type == "mineru_diffusion"
++    assert MinerUDiffusionConfig.architectures == [
++        "MinerUDiffusionForConditionalGeneration"
++    ]
++    assert config.text_config.model_type == "sdar"
++    assert config.vision_config.model_type == "qwen2_vl_vision"
++    assert config.mask_token_id == 151669
++    assert config.canvas_length == 32
++
++
++def test_mineru_model_type_detects_diffusion_without_canvas_length():
++    model_config = object.__new__(ModelConfig)
++    model_config.hf_config = SimpleNamespace(model_type="mineru_diffusion")
++
++    assert model_config.is_diffusion
++
++
++def test_num_transfer_tokens_matches_uniform_schedule():
++    assert get_num_transfer_tokens(32, 8) == [4, 4, 4, 4, 4, 4, 4, 4]
++    assert get_num_transfer_tokens(10, 4) == [3, 3, 2, 2]
++
++
++def test_select_transfer_indices_prefers_threshold_then_topk():
++    confidence = torch.tensor([[0.9, 0.1, 0.8, 0.7], [0.4, 0.3, 0.2, 0.1]])
++
++    selected = select_transfer_indices(
++        confidence,
++        threshold=0.75,
++        transfer_count=2,
++    )
++
++    assert selected.tolist() == [
++        [True, False, True, False],
++        [True, True, False, False],
++    ]
++
++
++def test_select_transfer_indices_ignores_invalid_positions():
++    confidence = torch.tensor([[0.7, -torch.inf, -torch.inf]])
++
++    selected = select_transfer_indices(
++        confidence,
++        threshold=0.95,
++        transfer_count=2,
++    )
++
++    assert selected.tolist() == [[True, False, False]]
++
++
++def test_greedy_sampling_returns_argmax_confidence():
++    logits = torch.tensor([[[0.0, 2.0, 1.0], [4.0, 0.0, 1.0]]])
++
++    token_ids, confidence = sample_with_temperature_topk_topp(
++        logits,
++        temperature=0.0,
++    )
++
++    assert token_ids.tolist() == [[1, 0]]
++    assert torch.allclose(
++        confidence,
++        torch.softmax(logits.float(), dim=-1).amax(dim=-1),
++    )
++
++
++def _tiny_vllm_config():
++    text_config = MinerUDiffusionConfig().text_config
++    text_config.vocab_size = 32
++    text_config.hidden_size = 16
++    text_config.intermediate_size = 32
++    text_config.num_hidden_layers = 1
++    text_config.num_attention_heads = 2
++    text_config.num_key_value_heads = 1
++    text_config.head_dim = 8
++    text_config.max_position_embeddings = 64
++
++    vision_config = Qwen2VLVisionConfig(
++        depth=1,
++        embed_dim=16,
++        hidden_size=16,
++        hidden_act="quick_gelu",
++        mlp_ratio=1,
++        num_heads=2,
++        in_channels=3,
++        patch_size=2,
++        spatial_merge_size=2,
++        temporal_patch_size=1,
++    )
++    config = MinerUDiffusionConfig(
++        text_config=text_config.to_dict(),
++        vision_config=vision_config.to_dict(),
++    )
++    return SimpleNamespace(
++        model_config=SimpleNamespace(
++            hf_config=config,
++            hf_text_config=config.text_config,
++            dtype=torch.float32,
++            is_mm_prefix_lm=False,
++            max_model_len=64,
++            uses_mrope=False,
++            uses_xdrope_dim=0,
++            get_inputs_embeds_size=lambda: config.text_config.hidden_size,
++            get_vocab_size=lambda: config.text_config.vocab_size,
++        )
++    )
++
++
++def _tiny_runtime_vllm_config():
++    vllm_config = _tiny_vllm_config()
++    vllm_config.cache_config = CacheConfig()
++    vllm_config.quant_config = None
++    vllm_config.compilation_config = CompilationConfig()
++    vllm_config.attention_config = AttentionConfig()
++    vllm_config.kv_transfer_config = KVTransferConfig()
++    vllm_config.diffusion_config = DiffusionConfig(
++        canvas_length=4,
++        max_denoising_steps=4,
++    )
++    vllm_config.scheduler_config = SimpleNamespace(
++        max_num_seqs=4,
++        max_num_batched_tokens=16,
++    )
++    return vllm_config
++
++
++def test_mineru_native_model_has_real_modules_and_logits_forward():
++    model = MinerUDiffusionForConditionalGeneration(vllm_config=_tiny_vllm_config())
++
++    assert hasattr(model, "language_model")
++    assert hasattr(model, "vision_model")
++    assert model.get_input_embeddings().num_embeddings == 32
++
++    input_ids = torch.tensor([1, 2, 3])
++    hidden_states = model(input_ids=input_ids, positions=torch.arange(3))
++    logits = model.compute_logits(hidden_states)
++
++    assert hidden_states.shape == (3, 16)
++    assert logits is not None
++    assert logits.shape == (3, 32)
++
++
++def test_mineru_model_provides_v2_diffusion_model_state():
++    model_state_cls = MinerUDiffusionForConditionalGeneration.get_model_state_cls()
++
++    assert issubclass(model_state_cls, ModelState)
++    assert model_state_cls.num_new_sampled_tokens_per_step == 0
++
++
++def test_mineru_model_state_mm_embeddings_profiles_substeps():
++    source = inspect.getsource(MinerUDiffusionModelState.get_mm_embeddings)
++
++    assert "mineru_mm_embeddings: prepare" in source
++    assert "mineru_mm_embeddings: encoder" in source
++    assert "mineru_mm_embeddings: gather" in source
++    assert "mineru_mm_embeddings: input_embeds" in source
++
++
++def test_mineru_sdar_attention_registers_vllm_kv_cache_layer():
++    vllm_config = _tiny_runtime_vllm_config()
++
++    with set_current_vllm_config(vllm_config):
++        model = MinerUDiffusionForConditionalGeneration(vllm_config=vllm_config)
++
++    self_attn = model.language_model.model.layers[0].self_attn
++    assert isinstance(self_attn.attn, Attention)
++    assert (
++        "language_model.model.layers.0.self_attn.attn"
++        in vllm_config.compilation_config.static_forward_context
++    )
++
++    kv_spec = self_attn.attn.get_kv_cache_spec(vllm_config)
++    assert kv_spec is not None
++    assert kv_spec.num_kv_heads == 1
++    assert kv_spec.head_size == 8
++
++
++def test_mineru_sdar_vllm_path_preserves_flat_runtime_tokens(monkeypatch):
++    vllm_config = _tiny_runtime_vllm_config()
++
++    with set_current_vllm_config(vllm_config):
++        model = MinerUDiffusionForConditionalGeneration(vllm_config=vllm_config)
++
++    self_attn = model.language_model.model.layers[0].self_attn
++    captured = {}
++
++    def fake_attention(query, key, value):
++        captured["query_shape"] = tuple(query.shape)
++        captured["key_shape"] = tuple(key.shape)
++        captured["value_shape"] = tuple(value.shape)
++        return torch.zeros_like(query)
++
++    monkeypatch.setattr(self_attn.attn, "forward", fake_attention)
++
++    inputs_embeds = torch.randn(3, 16)
++    hidden_states = model.language_model(
++        input_ids=None,
++        inputs_embeds=inputs_embeds,
++        position_ids=torch.arange(3),
++    )
++
++    assert hidden_states.shape == (3, 16)
++    assert captured["query_shape"] == (3, 16)
++    assert captured["key_shape"] == (3, 8)
++    assert captured["value_shape"] == (3, 8)
++
++
++def test_mineru_model_state_prepare_attn_uses_scheduled_block_phase(monkeypatch):
++    vllm_config = _tiny_runtime_vllm_config()
++    state = MinerUDiffusionModelState(
++        vllm_config=vllm_config,
++        model=torch.nn.Module(),
++        encoder_cache=None,
++        device=torch.device("cpu"),
++    )
++    state.diffusion_states.is_encoder_phase[:3] = torch.tensor([True, True, False])
++    captured = {}
++
++    def fake_build_attn_metadata(**kwargs):
++        captured.update(kwargs)
++        return {"metadata": "ok"}
++
++    monkeypatch.setattr(
++        "vllm.model_executor.models.mineru_diffusion.build_attn_metadata",
++        fake_build_attn_metadata,
++    )
++    input_batch = SimpleNamespace(
++        num_reqs=3,
++        num_reqs_after_padding=3,
++        num_tokens=8,
++        num_tokens_after_padding=8,
++        query_start_loc_np=np.array([0, 3, 5, 8], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 3, 5, 8], dtype=torch.int32),
++        num_scheduled_tokens=np.array([3, 2, 3], dtype=np.int32),
++        num_draft_tokens_per_req=np.array([0, 2, 3], dtype=np.int32),
++        idx_mapping=torch.tensor([0, 1, 2], dtype=torch.int64),
++        seq_lens=torch.tensor([3, 5, 8], dtype=torch.int32),
++        seq_lens_cpu_upper_bound=torch.tensor([3, 5, 8], dtype=torch.int32),
++        dcp_local_seq_lens=None,
++        positions=torch.arange(8),
++    )
++
++    out = state.prepare_attn(
++        input_batch=input_batch,
++        cudagraph_mode=CUDAGraphMode.NONE,
++        block_tables=(torch.empty(0),),
++        slot_mappings=torch.empty(1, 8, dtype=torch.int32),
++        attn_groups=[],
++        kv_cache_config=SimpleNamespace(kv_cache_groups=[]),
++    )
++
++    assert out == {"metadata": "ok"}
++    assert captured["causal"].tolist() == [True, False, False]
++    assert captured["num_tokens"] == 8
++    assert captured["max_seq_len"] == 8
++
++
++def test_mineru_sampler_prefill_denoise_then_commit_block():
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 2), -1, dtype=torch.int64)
++            )
++
++        def sample(self, logits, *args, **kwargs):
++            return torch.tensor([1, 2]), logits
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++        dynamic_threshold=0.0,
++    )
++    prefill_batch = SimpleNamespace(
++        num_reqs=1,
++        num_draft_tokens=0,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        num_computed_prefill_tokens_np=np.array([0], dtype=np.int32),
++        num_scheduled_tokens=np.array([3], dtype=np.int32),
++        prefill_len_np=np.array([3], dtype=np.int32),
++    )
++
++    prefill_out = sampler(logits=torch.empty(0, 3), input_batch=prefill_batch)
++
++    assert prefill_out.num_sampled.tolist() == [0]
++    assert states.is_encoder_phase.tolist() == [False]
++    assert sampler.req_states.draft_tokens.tolist() == [[0, 0]]
++
++    decode_batch = SimpleNamespace(
++        num_reqs=1,
++        num_draft_tokens=2,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        idx_mapping=torch.tensor([0], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 2], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0], dtype=torch.int64),
++        positions=torch.arange(2),
++        logits_indices=torch.arange(2),
++        input_ids=torch.tensor([0, 0], dtype=torch.int64),
++        expanded_local_pos=torch.arange(2),
++    )
++    logits = torch.tensor([[0.0, 9.0, 1.0], [0.0, 1.0, 9.0]])
++
++    denoise_out = sampler(logits=logits, input_batch=decode_batch)
++
++    assert denoise_out.num_sampled.tolist() == [0]
++    assert states.canvas.tolist() == [[1, 2]]
++    assert states.is_encoder_phase.tolist() == [True]
++    assert sampler.req_states.draft_tokens.tolist() == [[1, 2]]
++
++    commit_out = sampler(logits=logits, input_batch=decode_batch)
++
++    assert commit_out.num_sampled.tolist() == [2]
++    assert commit_out.sampled_token_ids.tolist() == [[1, 2]]
++    assert states.is_encoder_phase.tolist() == [False]
++    assert sampler.req_states.draft_tokens.tolist() == [[0, 0]]
++
++
++def test_mineru_sampler_debug_trace_records_prefill_canvas_and_commit(
++    tmp_path,
++    monkeypatch,
++):
++    trace_path = tmp_path / "mineru_trace.jsonl"
++    monkeypatch.setenv("VLLM_MINERU_DIFFUSION_DEBUG_TRACE", str(trace_path))
++    monkeypatch.setenv("VLLM_MINERU_DIFFUSION_DEBUG_TRACE_LIMIT", "10")
++
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 2), -1, dtype=torch.int64)
++            )
++
++        def sample(self, logits, *args, **kwargs):
++            return torch.tensor([1, 2]), logits
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++        dynamic_threshold=0.0,
++    )
++    prefill_batch = SimpleNamespace(
++        req_ids=["req-0"],
++        num_reqs=1,
++        num_draft_tokens=0,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        num_computed_tokens_np=np.array([0], dtype=np.int32),
++        num_computed_prefill_tokens_np=np.array([0], dtype=np.int32),
++        num_scheduled_tokens=np.array([3], dtype=np.int32),
++        prefill_len_np=np.array([3], dtype=np.int32),
++        query_start_loc_np=np.array([0, 3], dtype=np.int32),
++    )
++
++    sampler(logits=torch.empty(0, 3), input_batch=prefill_batch)
++
++    decode_batch = SimpleNamespace(
++        req_ids=["req-0"],
++        num_reqs=1,
++        num_draft_tokens=2,
++        num_draft_tokens_per_req=np.array([2], dtype=np.int32),
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        idx_mapping=torch.tensor([0], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 2], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0], dtype=torch.int64),
++        positions=torch.arange(2),
++        logits_indices=torch.arange(2),
++        input_ids=torch.tensor([0, 0], dtype=torch.int64),
++        expanded_local_pos=torch.arange(2),
++        num_computed_tokens_np=np.array([3], dtype=np.int32),
++        num_computed_prefill_tokens_np=np.array([3], dtype=np.int32),
++        num_scheduled_tokens=np.array([2], dtype=np.int32),
++        prefill_len_np=np.array([3], dtype=np.int32),
++    )
++    logits = torch.tensor([[0.0, 9.0, 1.0], [0.0, 1.0, 9.0]])
++
++    sampler(logits=logits, input_batch=decode_batch)
++    sampler(logits=logits, input_batch=decode_batch)
++
++    records = [
++        json.loads(line)
++        for line in trace_path.read_text(encoding="utf-8").splitlines()
++    ]
++
++    assert [record["event"] for record in records] == [
++        "mineru_diffusion_sampler_prefill",
++        "mineru_diffusion_sampler_denoise",
++        "mineru_diffusion_sampler_denoise",
++    ]
++    assert records[1]["batch"]["num_computed_tokens_np"] == [3]
++    assert records[1]["batch"]["prefill_len_np"] == [3]
++    assert records[1]["batch"]["num_scheduled_tokens"] == [2]
++    assert records[1]["batch"]["num_draft_tokens_per_req"] == [2]
++    assert records[1]["batch"]["position_ranges"] == [
++        {"len": 2, "max": 1, "min": 0}
++    ]
++
++    denoise_req = records[1]["requests"][0]
++    assert denoise_req["is_commit"] is False
++    assert denoise_req["mask_count_before"] == 2
++    assert denoise_req["transferred"] == 2
++    assert denoise_req["num_sampled"] == 0
++    assert denoise_req["num_rejected"] == 2
++
++    commit_req = records[2]["requests"][0]
++    assert commit_req["is_commit"] is True
++    assert commit_req["num_sampled"] == 2
++    assert commit_req["num_rejected"] == 0
++
++
++def test_mineru_sampler_debug_trace_uses_original_req_idx_for_mixed_batches(
++    tmp_path,
++    monkeypatch,
++):
++    trace_path = tmp_path / "mineru_trace.jsonl"
++    monkeypatch.setenv("VLLM_MINERU_DIFFUSION_DEBUG_TRACE", str(trace_path))
++
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=2,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++    states.is_encoder_phase[1] = True
++    states.canvas[1] = torch.tensor([1, 2], dtype=torch.int64)
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((2, 2), -1, dtype=torch.int64)
++            )
++
++        def sample(self, logits, *args, **kwargs):
++            return torch.tensor([1, 2]), logits
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++    )
++    mixed_batch = SimpleNamespace(
++        req_ids=["prefill", "commit"],
++        num_reqs=2,
++        num_draft_tokens=2,
++        num_draft_tokens_per_req=np.array([0, 2], dtype=np.int32),
++        idx_mapping_np=np.array([0, 1], dtype=np.int64),
++        idx_mapping=torch.tensor([0, 1], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 0, 2], dtype=np.int32),
++        query_start_loc_np=np.array([0, 3, 5], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 3, 5], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([1, 1], dtype=torch.int64),
++        positions=torch.arange(5),
++        logits_indices=torch.arange(2),
++        input_ids=torch.tensor([3, 4, 5, 0, 0], dtype=torch.int64),
++        expanded_local_pos=torch.arange(2),
++        num_computed_tokens_np=np.array([0, 3], dtype=np.int32),
++        num_computed_prefill_tokens_np=np.array([0, 3], dtype=np.int32),
++        num_scheduled_tokens=np.array([3, 2], dtype=np.int32),
++        prefill_len_np=np.array([3, 3], dtype=np.int32),
++    )
++    logits = torch.tensor([[0.0, 9.0, 1.0], [0.0, 1.0, 9.0]])
++
++    sampler(logits=logits, input_batch=mixed_batch)
++
++    record = json.loads(trace_path.read_text(encoding="utf-8").splitlines()[0])
++    traced_req = record["requests"][0]
++    assert traced_req["req_idx"] == 1
++    assert traced_req["num_sampled"] == 2
++    assert traced_req["num_rejected"] == 0
++
++
++def test_mineru_sampler_finishes_prefills_in_mixed_decode_batch():
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=2,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++    states.is_encoder_phase[:] = torch.tensor([False, True])
++    states.canvas[0] = torch.tensor([0, 0], dtype=torch.int64)
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((2, 2), -1, dtype=torch.int64)
++            )
++
++        def sample(self, logits, *args, **kwargs):
++            return torch.tensor([1, 2]), logits
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++        dynamic_threshold=0.0,
++    )
++    mixed_batch = SimpleNamespace(
++        num_reqs=2,
++        num_draft_tokens=2,
++        idx_mapping_np=np.array([0, 1], dtype=np.int64),
++        idx_mapping=torch.tensor([0, 1], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 2, 2], dtype=np.int32),
++        query_start_loc_np=np.array([0, 2, 5], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 2, 5], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0], dtype=torch.int64),
++        positions=torch.arange(5),
++        logits_indices=torch.arange(2),
++        input_ids=torch.tensor([0, 0, 3, 4, 5], dtype=torch.int64),
++        expanded_local_pos=torch.arange(2),
++        num_computed_prefill_tokens_np=np.array([3, 0], dtype=np.int32),
++        num_scheduled_tokens=np.array([2, 3], dtype=np.int32),
++        prefill_len_np=np.array([3, 3], dtype=np.int32),
++    )
++    logits = torch.tensor([[0.0, 9.0, 1.0], [0.0, 1.0, 9.0]])
++
++    out = sampler(logits=logits, input_batch=mixed_batch)
++
++    assert out.num_sampled.tolist() == [0, 0]
++    assert states.is_encoder_phase.tolist() == [True, False]
++    assert sampler.req_states.draft_tokens.tolist() == [[1, 2], [0, 0]]
++
++
++def test_mineru_sampler_commits_after_max_denoising_steps_even_if_mask_sampled():
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++    states.is_encoder_phase[0] = False
++    states.canvas[0] = torch.tensor([0, 0], dtype=torch.int64)
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 2), -1, dtype=torch.int64)
++            )
++
++        def sample(self, logits, *args, **kwargs):
++            return torch.tensor([0, 0]), logits
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=1,
++        dynamic_threshold=0.0,
++    )
++    decode_batch = SimpleNamespace(
++        num_reqs=1,
++        num_draft_tokens=2,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        idx_mapping=torch.tensor([0], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 2], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0], dtype=torch.int64),
++        positions=torch.arange(2),
++        logits_indices=torch.arange(2),
++        input_ids=torch.tensor([0, 0], dtype=torch.int64),
++        expanded_local_pos=torch.arange(2),
++    )
++    logits = torch.tensor([[9.0, 1.0, 0.0], [9.0, 1.0, 0.0]])
++
++    out = sampler(logits=logits, input_batch=decode_batch)
++
++    assert out.num_sampled.tolist() == [0]
++    assert states.step.tolist() == [1]
++    assert states.canvas.tolist() == [[0, 0]]
++    assert states.is_encoder_phase.tolist() == [True]
++    assert sampler.req_states.draft_tokens.tolist() == [[0, 0]]
++
++
++def test_mineru_sampler_mask_only_sampling_skips_accepted_rows(monkeypatch):
++    monkeypatch.setenv("VLLM_MINERU_DIFFUSION_MASK_ONLY_SAMPLING", "1")
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=3,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++    states.is_encoder_phase[0] = False
++    states.canvas[0] = torch.tensor([0, 9, 0], dtype=torch.int64)
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 3), -1, dtype=torch.int64)
++            )
++            self.calls = []
++
++        def sample(
++            self,
++            logits,
++            expanded_idx_mapping,
++            idx_mapping_np,
++            pos,
++            input_ids,
++            expanded_local_pos,
++            return_logprobs=False,
++        ):
++            self.calls.append(
++                {
++                    "num_logits": logits.shape[0],
++                    "pos": pos.tolist(),
++                    "input_ids": input_ids.tolist(),
++                    "expanded_local_pos": expanded_local_pos.tolist(),
++                    "return_logprobs": return_logprobs,
++                }
++            )
++            if logits.shape[0] == 2:
++                return torch.tensor([1, 2]), logits
++            return torch.tensor([1, 3, 2]), logits
++
++    base_sampler = FakeBaseSampler()
++    sampler = MinerUDiffusionSampler(
++        base_sampler,
++        diffusion_states=states,
++        canvas_length=3,
++        mask_token_id=0,
++        denoising_steps=1,
++        dynamic_threshold=0.99,
++    )
++    decode_batch = SimpleNamespace(
++        num_reqs=1,
++        num_draft_tokens=3,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        idx_mapping=torch.tensor([0], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 3], dtype=np.int32),
++        query_start_loc_np=np.array([0, 3], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 3], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0, 0], dtype=torch.int64),
++        positions=torch.tensor([10, 11, 12], dtype=torch.int64),
++        logits_indices=torch.arange(3),
++        input_ids=torch.tensor([0, 9, 0], dtype=torch.int64),
++        expanded_local_pos=torch.tensor([0, 1, 2], dtype=torch.int64),
++    )
++    logits = torch.tensor(
++        [
++            [0.0, 9.0, 1.0, 2.0],
++            [0.0, 1.0, 2.0, 9.0],
++            [0.0, 1.0, 9.0, 2.0],
++        ]
++    )
++
++    out = sampler(logits=logits, input_batch=decode_batch)
++
++    assert out.num_sampled.tolist() == [0]
++    assert states.canvas.tolist() == [[1, 9, 2]]
++    assert states.is_encoder_phase.tolist() == [True]
++    assert base_sampler.calls == [
++        {
++            "num_logits": 2,
++            "pos": [10, 12],
++            "input_ids": [0, 0],
++            "expanded_local_pos": [0, 2],
++            "return_logprobs": False,
++        }
++    ]
++
++
++def test_mineru_sampler_accepts_runner_compacted_logits(monkeypatch):
++    monkeypatch.setenv("VLLM_MINERU_DIFFUSION_MASK_ONLY_SAMPLING", "1")
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=3,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++    states.is_encoder_phase[0] = False
++    states.canvas[0] = torch.tensor([0, 9, 0], dtype=torch.int64)
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 3), -1, dtype=torch.int64)
++            )
++            self.calls = []
++
++        def sample(
++            self,
++            logits,
++            expanded_idx_mapping,
++            idx_mapping_np,
++            pos,
++            input_ids,
++            expanded_local_pos,
++            return_logprobs=False,
++        ):
++            self.calls.append(
++                {
++                    "num_logits": logits.shape[0],
++                    "pos": pos.tolist(),
++                    "input_ids": input_ids.tolist(),
++                    "expanded_local_pos": expanded_local_pos.tolist(),
++                }
++            )
++            return torch.tensor([1, 2]), logits
++
++    base_sampler = FakeBaseSampler()
++    sampler = MinerUDiffusionSampler(
++        base_sampler,
++        diffusion_states=states,
++        canvas_length=3,
++        mask_token_id=0,
++        denoising_steps=1,
++        dynamic_threshold=0.99,
++    )
++    decode_batch = SimpleNamespace(
++        num_reqs=1,
++        num_draft_tokens=3,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        idx_mapping=torch.tensor([0], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 3], dtype=np.int32),
++        query_start_loc_np=np.array([0, 3], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 3], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0, 0], dtype=torch.int64),
++        positions=torch.tensor([10, 11, 12], dtype=torch.int64),
++        logits_indices=torch.arange(3),
++        input_ids=torch.tensor([0, 9, 0], dtype=torch.int64),
++        expanded_local_pos=torch.tensor([0, 1, 2], dtype=torch.int64),
++        logits_row_indices=torch.tensor([0, 2], dtype=torch.int64),
++    )
++    compact_logits = torch.tensor(
++        [
++            [0.0, 9.0, 1.0, 2.0],
++            [0.0, 1.0, 9.0, 2.0],
++        ]
++    )
++
++    out = sampler(logits=compact_logits, input_batch=decode_batch)
++
++    assert out.num_sampled.tolist() == [0]
++    assert states.canvas.tolist() == [[1, 9, 2]]
++    assert states.is_encoder_phase.tolist() == [True]
++    assert base_sampler.calls == [
++        {
++            "num_logits": 2,
++            "pos": [10, 12],
++            "input_ids": [0, 0],
++            "expanded_local_pos": [0, 2],
++        }
++    ]
++
++
++def test_mineru_sampler_uses_request_max_denoising_steps_from_extra_args():
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 2), -1, dtype=torch.int64)
++            )
++
++        def add_request(self, req_idx, prompt_len, sampling_params):
++            pass
++
++        def sample(self, logits, *args, **kwargs):
++            return torch.tensor([1, 2]), logits
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++        dynamic_threshold=0.99,
++    )
++    sampler.add_request(
++        0,
++        3,
++        SimpleNamespace(extra_args={"max_denoising_steps": 1}),
++    )
++    states.is_encoder_phase[0] = False
++    states.canvas[0] = torch.tensor([0, 0], dtype=torch.int64)
++    decode_batch = SimpleNamespace(
++        num_reqs=1,
++        num_draft_tokens=2,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        idx_mapping=torch.tensor([0], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 2], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0], dtype=torch.int64),
++        positions=torch.arange(2),
++        logits_indices=torch.arange(2),
++        input_ids=torch.tensor([0, 0], dtype=torch.int64),
++        expanded_local_pos=torch.arange(2),
++    )
++    logits = torch.tensor([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
++
++    out = sampler(logits=logits, input_batch=decode_batch)
++
++    assert out.num_sampled.tolist() == [0]
++    assert states.step.tolist() == [1]
++    assert states.canvas.tolist() == [[1, 2]]
++    assert states.is_encoder_phase.tolist() == [True]
++    assert sampler.req_states.draft_tokens.tolist() == [[1, 2]]
++
++
++def test_mineru_sampler_uses_request_dynamic_threshold_from_extra_args():
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 2), -1, dtype=torch.int64)
++            )
++            self.added = []
++
++        def add_request(self, req_idx, prompt_len, sampling_params):
++            self.added.append((req_idx, prompt_len, sampling_params))
++
++        def sample(self, logits, *args, **kwargs):
++            return torch.tensor([1, 2]), logits
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++        dynamic_threshold=0.0,
++    )
++    sampler.add_request(
++        0,
++        3,
++        SimpleNamespace(extra_args={"dynamic_threshold": 0.95}),
++    )
++    states.is_encoder_phase[0] = False
++    states.canvas[0] = torch.tensor([0, 0], dtype=torch.int64)
++    decode_batch = SimpleNamespace(
++        num_reqs=1,
++        num_draft_tokens=2,
++        idx_mapping_np=np.array([0], dtype=np.int64),
++        idx_mapping=torch.tensor([0], dtype=torch.int64),
++        cu_num_logits_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc_np=np.array([0, 2], dtype=np.int32),
++        query_start_loc=torch.tensor([0, 2], dtype=torch.int32),
++        expanded_idx_mapping=torch.tensor([0, 0], dtype=torch.int64),
++        positions=torch.arange(2),
++        logits_indices=torch.arange(2),
++        input_ids=torch.tensor([0, 0], dtype=torch.int64),
++        expanded_local_pos=torch.arange(2),
++    )
++    logits = torch.tensor([[0.0, 9.0, 1.0], [0.0, 1.0, 2.0]])
++
++    out = sampler(logits=logits, input_batch=decode_batch)
++
++    assert out.num_sampled.tolist() == [0]
++    assert states.canvas.tolist() == [[1, 0]]
++    assert states.is_encoder_phase.tolist() == [False]
++    assert sampler.req_states.draft_tokens.tolist() == [[1, 0]]
++
++
++def test_mineru_sampler_rejects_request_block_size_mismatch():
++    states = MinerUDiffusionRequestStates(
++        max_num_reqs=1,
++        canvas_length=2,
++        mask_token_id=0,
++        device=torch.device("cpu"),
++    )
++
++    class FakeBaseSampler:
++        def __init__(self):
++            self.sampling_states = SimpleNamespace()
++            self.req_states = SimpleNamespace(
++                draft_tokens=torch.full((1, 2), -1, dtype=torch.int64)
++            )
++
++        def add_request(self, req_idx, prompt_len, sampling_params):
++            pass
++
++    sampler = MinerUDiffusionSampler(
++        FakeBaseSampler(),
++        diffusion_states=states,
++        canvas_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++    )
++
++    with pytest.raises(ValueError, match="block_size"):
++        sampler.add_request(
++            0,
++            3,
++            SimpleNamespace(extra_args={"block_size": 1}),
++        )
++
++
++def test_mineru_native_load_weights_copies_matching_parameters():
++    model = MinerUDiffusionForConditionalGeneration(vllm_config=_tiny_vllm_config())
++    weight = torch.full_like(model.language_model.lm_head.weight, 0.25)
++
++    loaded = model.load_weights([("language_model.lm_head.weight", weight)])
++
++    assert "language_model.lm_head.weight" in loaded
++    assert torch.equal(model.language_model.lm_head.weight, weight)
++
++
++def test_mineru_embed_multimodal_splits_image_features(monkeypatch):
++    model = MinerUDiffusionForConditionalGeneration(vllm_config=_tiny_vllm_config())
++    features = torch.arange(3 * 16, dtype=torch.float32).view(3, 16)
++
++    monkeypatch.setattr(
++        model,
++        "get_image_features",
++        lambda pixel_values, image_grid_thw: features,
++    )
++
++    outputs = model.embed_multimodal(
++        pixel_values=torch.zeros(12, 12),
++        image_grid_thw=torch.tensor([[1, 2, 4], [1, 2, 2]]),
++    )
++
++    assert len(outputs) == 2
++    assert outputs[0].shape == (2, 16)
++    assert outputs[1].shape == (1, 16)
++
++
++def test_mineru_embed_input_ids_accepts_vllm_multimodal_embeddings():
++    model = MinerUDiffusionForConditionalGeneration(vllm_config=_tiny_vllm_config())
++    input_ids = torch.tensor([1, 2, 3, 4])
++    is_multimodal = torch.tensor([False, True, True, False])
++    multimodal_embeddings = [torch.full((2, 16), 7.0)]
++
++    outputs = model.embed_input_ids(
++        input_ids,
++        multimodal_embeddings=multimodal_embeddings,
++        is_multimodal=is_multimodal,
++    )
++
++    assert torch.equal(outputs[is_multimodal], multimodal_embeddings[0])
++
++
++def test_sdar_generate_with_embeds_fills_masked_block(monkeypatch):
++    config = MinerUDiffusionConfig().text_config
++    config.vocab_size = 8
++    config.hidden_size = 8
++    config.intermediate_size = 16
++    config.num_hidden_layers = 1
++    config.num_attention_heads = 2
++    config.num_key_value_heads = 1
++    config.head_dim = 4
++    model = SDARForCausalLM(config)
++
++    call_count = 0
++
++    def fake_forward(*, input_ids=None, inputs_embeds=None, position_ids=None,
++                     attention_mask=None):
++        nonlocal call_count
++        call_count += 1
++        assert input_ids is None
++        assert inputs_embeds is not None
++        assert attention_mask is not None
++        hidden_states = torch.zeros(
++            inputs_embeds.shape[0],
++            inputs_embeds.shape[1],
++            config.hidden_size,
++            device=inputs_embeds.device,
++            dtype=inputs_embeds.dtype,
++        )
++        return hidden_states
++
++    def fake_lm_head(hidden_states):
++        logits = torch.full(
++            (*hidden_states.shape[:-1], config.vocab_size),
++            -100.0,
++            device=hidden_states.device,
++        )
++        logits[:, :, 3] = 100.0
++        logits[:, -1, 4] = 200.0
++        return logits
++
++    monkeypatch.setattr(model, "forward", fake_forward)
++    monkeypatch.setattr(model.lm_head, "forward", fake_lm_head)
++
++    prompt_embeds = torch.zeros(1, 3, config.hidden_size)
++
++    generated, step_map, _ = model.generate_with_embeds(
++        inputs_embeds=prompt_embeds,
++        gen_length=2,
++        block_length=2,
++        mask_token_id=0,
++        denoising_steps=2,
++        temperature=0.0,
++        dynamic_threshold=0.95,
++    )
++
++    assert generated.tolist() == [[3, 4]]
++    assert step_map.tolist() == [[1, 1]]
++    assert call_count == 1
++
++
++def test_mineru_generate_routes_through_language_diffusion(monkeypatch):
++    model = MinerUDiffusionForConditionalGeneration(vllm_config=_tiny_vllm_config())
++    model.config.image_token_id = 7
++    input_ids = torch.tensor([[1, model.config.image_token_id, 2]])
++    image_features = torch.full((1, 16), 5.0)
++
++    monkeypatch.setattr(
++        model,
++        "get_image_features",
++        lambda pixel_values, image_grid_thw: image_features,
++    )
++
++    captured = {}
++
++    def fake_generate_with_embeds(**kwargs):
++        captured.update(kwargs)
++        return (
++            torch.tensor([[3, 4]]),
++            torch.tensor([[1, 1]]),
++            torch.zeros(1, 2),
++        )
++
++    monkeypatch.setattr(
++        model.language_model,
++        "generate_with_embeds",
++        fake_generate_with_embeds,
++    )
++
++    generated, step_map, _ = model.generate(
++        input_ids=input_ids,
++        pixel_values=torch.zeros(4, 4),
++        image_grid_thw=torch.tensor([[1, 2, 2]]),
++        gen_length=2,
++        block_length=2,
++        mask_token_id=0,
++    )
++
++    assert generated.tolist() == [[3, 4]]
++    assert step_map.tolist() == [[1, 1]]
++    assert torch.equal(captured["inputs_embeds"][0, 1], image_features[0])
++    assert captured["gen_length"] == 2
+diff --git a/tests/models/registry.py b/tests/models/registry.py
+index 931dbfb61..d2bd1065c 100644
+--- a/tests/models/registry.py
++++ b/tests/models/registry.py
+@@ -886,6 +886,11 @@ _MULTIMODAL_EXAMPLE_MODELS = {
+         "google/diffusiongemma-26B-A4B-it",
+         trust_remote_code=True,
+     ),
++    "MinerUDiffusionForConditionalGeneration": _HfExamplesInfo(
++        "opendatalab/MinerU-Diffusion",
++        trust_remote_code=True,
++        is_available_online=False,
++    ),
+     "Gemma4ForConditionalGeneration": _HfExamplesInfo(
+         "google/gemma-4-E2B-it",
+         min_transformers_version="5.5.0",
+diff --git a/tests/v1/worker/gpu/test_model_runner_v2_mineru_logits.py b/tests/v1/worker/gpu/test_model_runner_v2_mineru_logits.py
+new file mode 100644
+index 000000000..1ca88135c
+--- /dev/null
++++ b/tests/v1/worker/gpu/test_model_runner_v2_mineru_logits.py
+@@ -0,0 +1,60 @@
++from types import SimpleNamespace
++
++import torch
++
++from vllm.v1.worker.gpu.model_runner import GPUModelRunner
++
++
++def test_v2_runner_uses_model_state_sample_hidden_state_compaction():
++    runner = object.__new__(GPUModelRunner)
++    captured = {}
++
++    class FakeModelState:
++        def prepare_sample_hidden_states(self, hidden_states, input_batch):
++            captured["input_logits_indices"] = input_batch.logits_indices.tolist()
++            selected_rows = torch.tensor([0, 2], dtype=torch.int64)
++            return hidden_states[selected_rows], selected_rows
++
++    class FakeModel:
++        def compute_logits(self, sample_hidden_states):
++            captured["compute_shape"] = tuple(sample_hidden_states.shape)
++            return torch.ones(sample_hidden_states.shape[0], 5)
++
++    class FakeSampler:
++        def __call__(self, logits, input_batch):
++            captured["sampler_logits_shape"] = tuple(logits.shape)
++            captured["logits_row_indices"] = input_batch.logits_row_indices.tolist()
++            return SimpleNamespace(
++                num_sampled=torch.tensor([0], dtype=torch.int32),
++                num_rejected=torch.tensor([3], dtype=torch.int32),
++            )
++
++    runner.model_state = FakeModelState()
++    runner.model = FakeModel()
++    runner.sampler = FakeSampler()
++    runner.rejection_sampler = None
++    runner.structured_outputs_worker = None
++
++    input_batch = SimpleNamespace(
++        logits_indices=torch.arange(3, dtype=torch.int64),
++        num_draft_tokens=1,
++    )
++    hidden_states = torch.arange(12, dtype=torch.float32).view(3, 4)
++
++    output, num_sampled, num_rejected = GPUModelRunner.sample(
++        runner,
++        hidden_states,
++        input_batch,
++        grammar_output=None,
++    )
++
++    assert output.num_sampled.tolist() == [0]
++    assert num_sampled.tolist() == [0]
++    assert num_rejected.tolist() == [3]
++    assert captured == {
++        "input_logits_indices": [0, 1, 2],
++        "compute_shape": (2, 4),
++        "sampler_logits_shape": (2, 5),
++        "logits_row_indices": [0, 2],
++    }
++    assert not hasattr(input_batch, "logits_row_indices")
+diff --git a/tests/v1/worker/gpu/test_model_runner_v2_profile_scopes.py b/tests/v1/worker/gpu/test_model_runner_v2_profile_scopes.py
+new file mode 100644
+index 000000000..8095ac9c2
+--- /dev/null
++++ b/tests/v1/worker/gpu/test_model_runner_v2_profile_scopes.py
+@@ -0,0 +1,22 @@
++from pathlib import Path
++
++
++def test_v2_gpu_model_runner_has_internal_profile_scopes():
++    source = Path("vllm/v1/worker/gpu/model_runner.py").read_text()
++
++    expected_scopes = [
++        "v2_gpu_model_runner: state_update",
++        "v2_gpu_model_runner: dispatch",
++        "v2_gpu_model_runner: prepare_inputs",
++        "v2_gpu_model_runner: prepare_attn",
++        "v2_gpu_model_runner: mm_embeddings",
++        "v2_gpu_model_runner: forward",
++        "v2_gpu_model_runner: sample_logits",
++        "v2_gpu_model_runner: prompt_logprobs",
++        "v2_gpu_model_runner: async_output",
++        "v2_gpu_model_runner: sample_postprocess",
++        "v2_gpu_model_runner: draft",
++    ]
++
++    for scope in expected_scopes:
++        assert scope in source
+diff --git a/vllm/config/model.py b/vllm/config/model.py
+index 87c0eec1b..0966b8623 100644
+--- a/vllm/config/model.py
++++ b/vllm/config/model.py
+@@ -1526,7 +1526,9 @@ class ModelConfig:
+     @cached_property
+     def is_diffusion(self) -> bool:
+         """Detect discrete diffusion (dLLM) models from HF config."""
+-        return getattr(self.hf_config, "canvas_length", None) is not None
++        if getattr(self.hf_config, "canvas_length", None) is not None:
++            return True
++        return getattr(self.hf_config, "model_type", None) == "mineru_diffusion"
+ 
+     @property
+     def uses_alibi(self) -> bool:
+diff --git a/vllm/model_executor/models/config.py b/vllm/model_executor/models/config.py
+index 6b21ef830..bf9e4216f 100644
+--- a/vllm/model_executor/models/config.py
++++ b/vllm/model_executor/models/config.py
+@@ -173,6 +173,43 @@ class DiffusionGemmaModelForBlockDiffusionConfig(VerifyAndUpdateConfig):
+             )
+ 
+ 
++class MinerUDiffusionForConditionalGenerationConfig(VerifyAndUpdateConfig):
++    @classmethod
++    def verify_and_update_config(cls, vllm_config: "VllmConfig") -> None:
++        """Enable native diffusion scheduling defaults for MinerU-Diffusion."""
++        from vllm.v1.attention.backends.registry import AttentionBackendEnum
++
++        attention_config = vllm_config.attention_config
++        if attention_config.backend == AttentionBackendEnum.FLASHINFER:
++            raise ValueError(
++                "FlashInfer does not support MinerU-Diffusion's mixed "
++                "causal/bidirectional attention. Use --attention-backend "
++                "FLASH_ATTN or TRITON_ATTN instead."
++            )
++        if attention_config.backend is None and not attention_config.use_non_causal:
++            attention_config.use_non_causal = True
++            logger.info(
++                "MinerU-Diffusion uses causal prompt attention and "
++                "bidirectional block denoising; setting use_non_causal=True."
++            )
++
++        if vllm_config.diffusion_config is None:
++            from vllm.config.diffusion import DiffusionConfig
++
++            hf_config = vllm_config.model_config.hf_config
++            canvas_length = getattr(hf_config, "canvas_length", 32)
++            vllm_config.diffusion_config = DiffusionConfig(
++                canvas_length=canvas_length,
++                max_denoising_steps=canvas_length,
++            )
++
++        from vllm.config.scheduler import SchedulerConfig
++
++        sc = vllm_config.scheduler_config
++        if sc is not None and sc.max_num_seqs >= SchedulerConfig.DEFAULT_MAX_NUM_SEQS:
++            sc.max_num_seqs = 8
++
++
+ class DeepseekV4ForCausalLMConfig(VerifyAndUpdateConfig):
+     @staticmethod
+     def verify_and_update_model_config(model_config: "ModelConfig") -> None:
+@@ -679,6 +716,7 @@ MODELS_CONFIG_MAP: dict[str, type[VerifyAndUpdateConfig]] = {
+     "LlamaNemotronVLModel": LlamaNemotronVLConfig,
+     "Mamba2ForCausalLM": MambaModelConfig,
+     "MambaForCausalLM": MambaModelConfig,
++    "MinerUDiffusionForConditionalGeneration": MinerUDiffusionForConditionalGenerationConfig,  # noqa: E501
+     "NemotronHForCausalLM": NemotronHForCausalLMConfig,
+     "NemotronHPuzzleForCausalLM": NemotronHForCausalLMConfig,
+     "NemotronH_Nano_VL_V2": NemotronHNanoVLV2Config,
+diff --git a/vllm/model_executor/models/mineru_diffusion.py b/vllm/model_executor/models/mineru_diffusion.py
+new file mode 100644
+index 000000000..661ba7b6c
+--- /dev/null
++++ b/vllm/model_executor/models/mineru_diffusion.py
+@@ -0,0 +1,1887 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++"""Experimental MinerU-Diffusion entry point.
++
++This module provides the config/model registry surface, MinerU's remasking
++primitives, and the native SDAR modules used by the compatibility benchmark.
++The v2 ModelState integration below is the entry point for replacing the
++compatibility path with vLLM KV-cache driven diffusion serving.
++"""
++
++from __future__ import annotations
++
++from collections.abc import Iterable, Mapping, Sequence
++from functools import partial
++import json
++import os
++import re
++import time
++from typing import Any
++
++import numpy as np
++import torch
++import torch.nn.functional as F
++from torch import nn
++from transformers import BatchFeature
++from transformers.activations import ACT2FN
++from transformers.models.qwen2_vl.modeling_qwen2_vl import (
++    Qwen2VisionTransformerPretrainedModel,
++)
++
++from vllm.config import CUDAGraphMode, VllmConfig, get_current_vllm_config_or_none
++from vllm.config.multimodal import BaseDummyOptions
++from vllm.model_executor.layers.attention import Attention
++from vllm.model_executor.models.utils import (
++    WeightsMapper,
++    _merge_multimodal_embeddings,
++    maybe_prefix,
++)
++from vllm.v1.worker.gpu.model_states.default import DefaultModelState
++from vllm.v1.worker.gpu.attn_utils import build_attn_metadata
++from vllm.v1.worker.gpu.sample.output import SamplerOutput
++from vllm.v1.utils import record_function_or_nullcontext
++from vllm.multimodal import MULTIMODAL_REGISTRY
++from vllm.inputs import MultiModalDataDict
++from vllm.multimodal.inputs import MultiModalFieldConfig, MultiModalKwargsItems
++from vllm.multimodal.parse import MultiModalDataItems
++from vllm.multimodal.processing import (
++    BaseDummyInputsBuilder,
++    BaseMultiModalProcessor,
++    PromptReplacement,
++    PromptUpdate,
++)
++
++from .interfaces import MultiModalEmbeddings, SupportsMultiModal
++from .qwen2_vl import (
++    Qwen2VLProcessingInfo,
++    _create_qwen2vl_field_factory,
++)
++
++_DEBUG_TRACE_ENV = "VLLM_MINERU_DIFFUSION_DEBUG_TRACE"
++_DEBUG_TRACE_LIMIT_ENV = "VLLM_MINERU_DIFFUSION_DEBUG_TRACE_LIMIT"
++_MASK_ONLY_SAMPLING_ENV = "VLLM_MINERU_DIFFUSION_MASK_ONLY_SAMPLING"
++_debug_trace_counts: dict[str, int] = {}
++
++
++def _mineru_debug_trace_enabled() -> bool:
++    return bool(os.environ.get(_DEBUG_TRACE_ENV))
++
++
++def _env_flag_enabled(name: str) -> bool:
++    value = os.environ.get(name)
++    return value is not None and value.lower() not in {"", "0", "false", "no"}
++
++
++def _mineru_mask_only_logits_row_indices(
++    input_batch: Any,
++    states: "MinerUDiffusionRequestStates",
++    mask_token_id: int,
++    device: torch.device,
++) -> torch.Tensor:
++    sample_mask = torch.zeros(
++        int(input_batch.cu_num_logits_np[input_batch.num_reqs]),
++        dtype=torch.bool,
++        device=device,
++    )
++    slots_np = input_batch.idx_mapping_np[: input_batch.num_reqs]
++    per_req_nlogits_np = np.diff(
++        input_batch.cu_num_logits_np[: input_batch.num_reqs + 1]
++    )
++    for req_idx in range(input_batch.num_reqs):
++        valid_len = int(per_req_nlogits_np[req_idx])
++        if valid_len <= 0:
++            continue
++        slot = int(slots_np[req_idx])
++        if bool(states.is_encoder_phase[slot].item()):
++            continue
++        start = int(input_batch.cu_num_logits_np[req_idx])
++        end = start + valid_len
++        sample_mask[start:end] = (
++            states.canvas[slot, :valid_len] == mask_token_id
++        ).to(device)
++    return torch.nonzero(sample_mask, as_tuple=False).flatten()
++
++
++def _mineru_trace_value(value: Any) -> Any:
++    if isinstance(value, np.ndarray):
++        return value.tolist()
++    if isinstance(value, np.generic):
++        return value.item()
++    if isinstance(value, torch.Tensor):
++        tensor = value.detach()
++        if tensor.numel() > 256:
++            return {
++                "shape": list(tensor.shape),
++                "dtype": str(tensor.dtype),
++                "device": str(tensor.device),
++            }
++        return tensor.cpu().tolist()
++    if isinstance(value, Mapping):
++        return {str(k): _mineru_trace_value(v) for k, v in value.items()}
++    if isinstance(value, (list, tuple)):
++        return [_mineru_trace_value(item) for item in value]
++    return value
++
++
++def _mineru_batch_trace_payload(input_batch: Any) -> dict[str, Any]:
++    fields = (
++        "req_ids",
++        "num_reqs",
++        "num_tokens",
++        "num_tokens_after_padding",
++        "num_draft_tokens",
++        "num_draft_tokens_per_req",
++        "num_scheduled_tokens",
++        "query_start_loc_np",
++        "cu_num_logits_np",
++        "num_computed_tokens_np",
++        "prefill_len_np",
++        "num_computed_prefill_tokens_np",
++        "is_prefilling_np",
++    )
++    payload = {
++        field: _mineru_trace_value(getattr(input_batch, field))
++        for field in fields
++        if hasattr(input_batch, field)
++    }
++    if hasattr(input_batch, "positions") and hasattr(input_batch, "query_start_loc_np"):
++        positions = input_batch.positions.detach().cpu()
++        ranges: list[dict[str, int | None]] = []
++        query_start_loc_np = input_batch.query_start_loc_np
++        num_reqs = int(getattr(input_batch, "num_reqs", len(query_start_loc_np) - 1))
++        for req_idx in range(num_reqs):
++            start = int(query_start_loc_np[req_idx])
++            end = int(query_start_loc_np[req_idx + 1])
++            if end <= start:
++                ranges.append({"len": 0, "min": None, "max": None})
++                continue
++            req_positions = positions[start:end]
++            ranges.append(
++                {
++                    "len": end - start,
++                    "min": int(req_positions.min().item()),
++                    "max": int(req_positions.max().item()),
++                }
++            )
++        payload["position_ranges"] = ranges
++    return payload
++
++
++def _mineru_debug_trace(event: str, **payload: Any) -> None:
++    path = os.environ.get(_DEBUG_TRACE_ENV)
++    if not path:
++        return
++    limit = int(os.environ.get(_DEBUG_TRACE_LIMIT_ENV, "10000"))
++    count = _debug_trace_counts.get(path, 0)
++    if limit >= 0 and count >= limit:
++        return
++    _debug_trace_counts[path] = count + 1
++
++    parent = os.path.dirname(path)
++    if parent:
++        os.makedirs(parent, exist_ok=True)
++    record = {
++        "event": event,
++        "pid": os.getpid(),
++        "time": time.time(),
++        **{key: _mineru_trace_value(value) for key, value in payload.items()},
++    }
++    with open(path, "a", encoding="utf-8") as trace_file:
++        trace_file.write(json.dumps(record, sort_keys=True) + "\n")
++
++
++class MinerUDiffusionSampler:
++    """Block diffusion sampler for MinerU's v2 runtime path."""
++
++    def __init__(
++        self,
++        sampler: Any,
++        *,
++        diffusion_states: "MinerUDiffusionRequestStates" | None = None,
++        canvas_length: int | None = None,
++        mask_token_id: int | None = None,
++        denoising_steps: int | None = None,
++        dynamic_threshold: float = 0.85,
++    ):
++        self.sampler = sampler
++        self.sampling_states = sampler.sampling_states
++        self.req_states = sampler.req_states
++        self.diffusion_states = diffusion_states
++        self.canvas_length = canvas_length or (
++            diffusion_states.canvas_length if diffusion_states is not None else 32
++        )
++        self.mask_token_id = mask_token_id if mask_token_id is not None else (
++            diffusion_states.mask_token_id if diffusion_states is not None else 0
++        )
++        self.denoising_steps = denoising_steps or self.canvas_length
++        self.dynamic_threshold = dynamic_threshold
++        self.num_transfer_tokens = get_num_transfer_tokens(
++            self.canvas_length,
++            self.denoising_steps,
++        )
++        self._transfer_schedule_cache = {
++            self.denoising_steps: self.num_transfer_tokens
++        }
++        if diffusion_states is not None:
++            self.dynamic_threshold_by_slot = torch.full(
++                (diffusion_states.max_num_reqs,),
++                float(dynamic_threshold),
++                dtype=torch.float32,
++                device=diffusion_states.device,
++            )
++            self.denoising_steps_by_slot = torch.full(
++                (diffusion_states.max_num_reqs,),
++                int(self.denoising_steps),
++                dtype=torch.int32,
++                device=diffusion_states.device,
++            )
++        else:
++            self.dynamic_threshold_by_slot = None
++            self.denoising_steps_by_slot = None
++
++    def __getattr__(self, name: str) -> Any:
++        return getattr(self.sampler, name)
++
++    def add_request(self, req_idx: int, prompt_len: int, sampling_params: Any) -> None:
++        extra_args = getattr(sampling_params, "extra_args", None) or {}
++        requested_block_size = extra_args.get("block_size")
++        if requested_block_size is not None:
++            requested_block_size = int(requested_block_size)
++            if requested_block_size != self.canvas_length:
++                raise ValueError(
++                    "MinerU-Diffusion vLLM serving currently requires request "
++                    f"block_size={requested_block_size} to match engine "
++                    f"canvas_length={self.canvas_length}."
++                )
++
++        self.sampler.add_request(req_idx, prompt_len, sampling_params)
++        if self.dynamic_threshold_by_slot is None:
++            return
++        threshold = extra_args.get("dynamic_threshold", self.dynamic_threshold)
++        self.dynamic_threshold_by_slot[req_idx] = float(threshold)
++        requested_steps = extra_args.get(
++            "max_denoising_steps",
++            extra_args.get("denoising_steps", self.denoising_steps),
++        )
++        requested_steps = int(requested_steps)
++        if requested_steps <= 0 or requested_steps > self.canvas_length:
++            raise ValueError(
++                "MinerU-Diffusion max_denoising_steps must be in "
++                f"[1, {self.canvas_length}], got {requested_steps}."
++            )
++        if self.denoising_steps_by_slot is not None:
++            self.denoising_steps_by_slot[req_idx] = requested_steps
++
++    def apply_staged_writes(self) -> None:
++        self.sampler.apply_staged_writes()
++
++    def _empty_output(
++        self,
++        *,
++        num_reqs: int,
++        device: torch.device,
++        width: int = 1,
++    ) -> SamplerOutput:
++        sampled = torch.zeros(num_reqs, width, dtype=torch.int64, device=device)
++        num_sampled = torch.zeros(num_reqs, dtype=torch.int32, device=device)
++        return SamplerOutput(
++            sampled_token_ids=sampled,
++            logprobs_tensors=None,
++            num_nans=None,
++            num_sampled=num_sampled,
++            num_rejected=num_sampled,
++        )
++
++    def _finish_prefills(
++        self,
++        input_batch: Any,
++        prefill_indices: np.ndarray | None = None,
++    ) -> None:
++        states = self.diffusion_states
++        if states is None:
++            return
++        if prefill_indices is None:
++            prefill_indices = np.arange(input_batch.num_reqs)
++        done_prefill = (
++            input_batch.num_computed_prefill_tokens_np[prefill_indices]
++            + input_batch.num_scheduled_tokens[prefill_indices]
++            >= input_batch.prefill_len_np[prefill_indices]
++        )
++        slots_np = input_batch.idx_mapping_np[prefill_indices[done_prefill]]
++        if len(slots_np) == 0:
++            return
++        slots = torch.as_tensor(slots_np, dtype=torch.int64, device=states.device)
++        states.init_canvas(slots)
++        self.req_states.draft_tokens[slots, : self.canvas_length] = states.canvas[
++            slots
++        ]
++        states.is_encoder_phase[slots] = False
++
++    def _sample_logits(
++        self,
++        logits: torch.Tensor,
++        input_batch: Any,
++        selected_indices: torch.Tensor | None = None,
++        *,
++        logits_are_compacted: bool = False,
++    ) -> tuple[torch.Tensor, torch.Tensor]:
++        sample_logits = logits
++        if selected_indices is not None and not logits_are_compacted:
++            sample_logits = logits[selected_indices]
++        if hasattr(input_batch, "expanded_idx_mapping"):
++            expanded_idx_mapping = input_batch.expanded_idx_mapping
++            pos = input_batch.positions[input_batch.logits_indices]
++            input_ids = input_batch.input_ids[input_batch.logits_indices]
++            expanded_local_pos = input_batch.expanded_local_pos
++            if selected_indices is not None:
++                expanded_idx_mapping = expanded_idx_mapping[selected_indices]
++                pos = pos[selected_indices]
++                input_ids = input_ids[selected_indices]
++                expanded_local_pos = expanded_local_pos[selected_indices]
++            return self.sampler.sample(
++                sample_logits,
++                expanded_idx_mapping,
++                input_batch.idx_mapping_np,
++                pos,
++                input_ids,
++                expanded_local_pos,
++                return_logprobs=False,
++            )
++        return sample_logits.argmax(dim=-1), sample_logits.float()
++
++    def _denoising_steps_for_slot(self, slot: int) -> int:
++        if self.denoising_steps_by_slot is None:
++            return self.denoising_steps
++        return int(self.denoising_steps_by_slot[slot].item())
++
++    def _transfer_schedule_for_steps(self, denoising_steps: int) -> list[int]:
++        schedule = self._transfer_schedule_cache.get(denoising_steps)
++        if schedule is None:
++            schedule = get_num_transfer_tokens(self.canvas_length, denoising_steps)
++            self._transfer_schedule_cache[denoising_steps] = schedule
++        return schedule
++
++    def _mask_only_sample_indices(
++        self,
++        input_batch: Any,
++        per_req_nlogits_np: np.ndarray,
++        states: "MinerUDiffusionRequestStates",
++        device: torch.device,
++    ) -> torch.Tensor:
++        return _mineru_mask_only_logits_row_indices(
++            input_batch,
++            states,
++            self.mask_token_id,
++            device,
++        )
++
++    def _build_output(
++        self,
++        input_batch: Any,
++        sampled: torch.Tensor,
++        num_sampled: torch.Tensor,
++        per_req_nlogits_np: np.ndarray,
++    ) -> SamplerOutput:
++        device = sampled.device
++        num_reqs = input_batch.num_reqs
++        num_logits = torch.as_tensor(
++            per_req_nlogits_np, dtype=torch.int32, device=device
++        )
++        if hasattr(input_batch, "query_start_loc_np"):
++            query_lens = torch.as_tensor(
++                np.diff(input_batch.query_start_loc_np[: num_reqs + 1]),
++                dtype=torch.int32,
++                device=device,
++            )
++        else:
++            query_lens = num_logits
++        num_rejected = torch.where(
++            (num_logits > 0) & (num_sampled == 0),
++            query_lens,
++            num_logits - num_sampled,
++        )
++        return SamplerOutput(
++            sampled_token_ids=sampled,
++            logprobs_tensors=None,
++            num_nans=None,
++            num_sampled=num_sampled,
++            num_rejected=num_rejected,
++        )
++
++    def __call__(
++        self,
++        logits: torch.Tensor,
++        input_batch: Any,
++        draft_logits: torch.Tensor | None = None,
++    ) -> SamplerOutput:
++        del draft_logits
++        if self.diffusion_states is None:
++            return self.sampler(logits, input_batch)
++
++        num_reqs = input_batch.num_reqs
++        device = logits.device
++        if input_batch.num_draft_tokens == 0:
++            self._finish_prefills(input_batch)
++            output = self._empty_output(num_reqs=num_reqs, device=device)
++            _mineru_debug_trace(
++                "mineru_diffusion_sampler_prefill",
++                batch=_mineru_batch_trace_payload(input_batch),
++                num_sampled=output.num_sampled,
++                num_rejected=output.num_rejected,
++            )
++            return output
++
++        states = self.diffusion_states
++        per_req_nlogits_np = np.diff(input_batch.cu_num_logits_np[: num_reqs + 1])
++        prefill_indices = np.where(per_req_nlogits_np == 0)[0]
++        if len(prefill_indices) > 0:
++            self._finish_prefills(input_batch, prefill_indices)
++        sampled = torch.zeros(
++            num_reqs, self.canvas_length, dtype=torch.int64, device=device
++        )
++        num_sampled = torch.zeros(num_reqs, dtype=torch.int32, device=device)
++
++        runner_logits_row_indices = getattr(input_batch, "logits_row_indices", None)
++        logits_are_compacted = runner_logits_row_indices is not None
++        mask_only_sampling = (
++            _env_flag_enabled(_MASK_ONLY_SAMPLING_ENV) or logits_are_compacted
++        )
++        sample_indices: torch.Tensor | None = None
++        if runner_logits_row_indices is not None:
++            sample_indices = runner_logits_row_indices.to(device=device)
++        elif mask_only_sampling:
++            sample_indices = self._mask_only_sample_indices(
++                input_batch,
++                per_req_nlogits_np,
++                states,
++                device,
++            )
++
++        if sample_indices is not None and sample_indices.numel() == 0:
++            sampled_tokens = torch.zeros(
++                logits.shape[0], dtype=torch.int64, device=device
++            )
++            confidence = torch.full(
++                (logits.shape[0],), -torch.inf, dtype=torch.float32, device=device
++            )
++        else:
++            sampled_subset, processed_logits = self._sample_logits(
++                logits,
++                input_batch,
++                sample_indices,
++                logits_are_compacted=logits_are_compacted,
++            )
++            probs = torch.softmax(processed_logits.float(), dim=-1)
++            confidence_subset = probs.gather(
++                -1, sampled_subset.view(-1, 1)
++            ).squeeze(-1)
++            if sample_indices is None:
++                sampled_tokens = sampled_subset
++                confidence = confidence_subset
++            else:
++                num_logits = int(input_batch.cu_num_logits_np[num_reqs])
++                sampled_tokens = torch.zeros(
++                    num_logits, dtype=sampled_subset.dtype, device=device
++                )
++                confidence = torch.full(
++                    (num_logits,),
++                    -torch.inf,
++                    dtype=confidence_subset.dtype,
++                    device=device,
++                )
++                sampled_tokens[sample_indices] = sampled_subset
++                confidence[sample_indices] = confidence_subset
++
++        slots_np = input_batch.idx_mapping_np[:num_reqs]
++        trace_requests: list[dict[str, Any]] | None = (
++            [] if _mineru_debug_trace_enabled() else None
++        )
++        for req_idx in range(num_reqs):
++            valid_len = int(per_req_nlogits_np[req_idx])
++            if valid_len <= 0:
++                continue
++            slot = int(slots_np[req_idx])
++            start = int(input_batch.cu_num_logits_np[req_idx])
++            end = start + valid_len
++            is_commit = bool(states.is_encoder_phase[slot].item())
++            step_before = int(states.step[slot].item())
++            mask_count_before = int(
++                (states.canvas[slot, :valid_len] == self.mask_token_id).sum().item()
++            )
++
++            if is_commit:
++                sampled[req_idx, :valid_len] = states.canvas[slot, :valid_len]
++                num_sampled[req_idx] = valid_len
++                slot_tensor = torch.tensor(
++                    [slot], dtype=torch.int64, device=states.device
++                )
++                states.init_canvas(slot_tensor)
++                self.req_states.draft_tokens[
++                    slot, : self.canvas_length
++                ] = states.canvas[slot]
++                states.is_encoder_phase[slot] = False
++                if trace_requests is not None:
++                    trace_requests.append(
++                        {
++                            "req_idx": req_idx,
++                            "slot": slot,
++                            "valid_len": valid_len,
++                            "is_commit": True,
++                            "step_before": step_before,
++                            "step_after": int(states.step[slot].item()),
++                            "mask_count_before": mask_count_before,
++                            "mask_count_after": int(
++                                (
++                                    states.canvas[slot, :valid_len]
++                                    == self.mask_token_id
++                                )
++                                .sum()
++                                .item()
++                            ),
++                            "transferred": 0,
++                        }
++                    )
++                continue
++
++            current = states.canvas[slot, :valid_len]
++            mask_index = current == self.mask_token_id
++            reached_max_steps = False
++            transfer_count = 0
++            transferred = 0
++            if bool(mask_index.any().item()):
++                row_confidence = torch.where(
++                    mask_index,
++                    confidence[start:end].to(current.device),
++                    torch.full(
++                        (valid_len,),
++                        -torch.inf,
++                        dtype=confidence.dtype,
++                        device=current.device,
++                    ),
++                )
++                step = step_before
++                denoising_steps = self._denoising_steps_for_slot(slot)
++                transfer_schedule = self._transfer_schedule_for_steps(denoising_steps)
++                transfer_count = transfer_schedule[min(step, denoising_steps - 1)]
++                transfer_index = select_transfer_indices(
++                    row_confidence.unsqueeze(0),
++                    threshold=float(self.dynamic_threshold_by_slot[slot].item())
++                    if self.dynamic_threshold_by_slot is not None
++                    else self.dynamic_threshold,
++                    transfer_count=transfer_count,
++                ).squeeze(0)
++                if step + 1 >= denoising_steps:
++                    transfer_index = mask_index
++                sampled_row = sampled_tokens[start:end].to(current.device)
++                current[transfer_index] = sampled_row[transfer_index]
++                states.canvas[slot, :valid_len] = current
++                states.step[slot] += 1
++                reached_max_steps = step + 1 >= denoising_steps
++                transferred = int(transfer_index.sum().item())
++
++            done = reached_max_steps or not bool(
++                (states.canvas[slot, :valid_len] == self.mask_token_id).any()
++            )
++            states.is_encoder_phase[slot] = done
++            self.req_states.draft_tokens[slot, : self.canvas_length] = states.canvas[
++                slot
++            ]
++            if trace_requests is not None:
++                trace_requests.append(
++                    {
++                        "req_idx": req_idx,
++                        "slot": slot,
++                        "valid_len": valid_len,
++                        "is_commit": False,
++                        "step_before": step_before,
++                        "step_after": int(states.step[slot].item()),
++                        "mask_count_before": mask_count_before,
++                        "mask_count_after": int(
++                            (
++                                states.canvas[slot, :valid_len]
++                                == self.mask_token_id
++                            )
++                            .sum()
++                            .item()
++                        ),
++                        "transfer_count": int(transfer_count),
++                        "transferred": transferred,
++                        "done": done,
++                    }
++                )
++
++        output = self._build_output(
++            input_batch,
++            sampled,
++            num_sampled,
++            per_req_nlogits_np,
++        )
++        if trace_requests is not None:
++            for request in trace_requests:
++                req_idx = int(request["req_idx"])
++                request["num_sampled"] = int(output.num_sampled[req_idx].item())
++                request["num_rejected"] = int(output.num_rejected[req_idx].item())
++            _mineru_debug_trace(
++                "mineru_diffusion_sampler_denoise",
++                batch=_mineru_batch_trace_payload(input_batch),
++                per_req_num_logits=per_req_nlogits_np,
++                requests=trace_requests,
++            )
++        return output
++
++
++class MinerUDiffusionRequestStates:
++    """Per-request runtime state for MinerU block diffusion scheduling."""
++
++    def __init__(
++        self,
++        *,
++        max_num_reqs: int,
++        canvas_length: int,
++        mask_token_id: int,
++        device: torch.device,
++    ) -> None:
++        self.max_num_reqs = max_num_reqs
++        self.canvas_length = canvas_length
++        self.mask_token_id = mask_token_id
++        self.device = device
++        self.is_encoder_phase = torch.zeros(
++            max_num_reqs, dtype=torch.bool, device=device
++        )
++        self.canvas = torch.full(
++            (max_num_reqs, canvas_length),
++            mask_token_id,
++            dtype=torch.int64,
++            device=device,
++        )
++        self.step = torch.zeros(max_num_reqs, dtype=torch.int32, device=device)
++        self.prompt_len = torch.zeros(max_num_reqs, dtype=torch.int32, device=device)
++
++    def init_canvas(self, slots: torch.Tensor) -> None:
++        self.canvas[slots, :] = self.mask_token_id
++        self.step[slots] = 0
++
++    def add_request(self, slot: int) -> None:
++        slot_tensor = torch.tensor([slot], dtype=torch.int64, device=self.device)
++        self.is_encoder_phase[slot] = True
++        self.init_canvas(slot_tensor)
++
++    def remove_request(self, slot: int) -> None:
++        self.is_encoder_phase[slot] = False
++        self.canvas[slot, :] = self.mask_token_id
++        self.step[slot] = 0
++        self.prompt_len[slot] = 0
++
++
++class MinerUDiffusionModelState(DefaultModelState):
++    """v2 ModelState registration point for MinerU block diffusion.
++
++    This first stage switches MinerU off the default AR ModelState and gives the
++    model a dedicated place to implement canvas state, draft-token scheduling,
++    and mixed prefill/denoise attention.
++    """
++
++    num_new_sampled_tokens_per_step: int = 0
++
++    def __init__(
++        self,
++        vllm_config: VllmConfig,
++        model: nn.Module,
++        encoder_cache: Any,
++        device: torch.device,
++    ) -> None:
++        super().__init__(vllm_config, model, encoder_cache, device)
++        diffusion_config = getattr(vllm_config, "diffusion_config", None)
++        canvas_length = (
++            diffusion_config.canvas_length
++            if diffusion_config is not None and diffusion_config.canvas_length
++            else 32
++        )
++        mask_token_id = getattr(self.model_config.hf_config, "mask_token_id", None)
++        if mask_token_id is None:
++            mask_token_id = getattr(self.model_config.hf_text_config, "mask_token_id")
++        self.diffusion_states = MinerUDiffusionRequestStates(
++            max_num_reqs=self.max_num_reqs,
++            canvas_length=canvas_length,
++            mask_token_id=int(mask_token_id),
++            device=device,
++        )
++        self._req_id_to_index: dict[str, int] = {}
++        self._causal_buf = torch.zeros(
++            self.max_num_reqs, dtype=torch.bool, device=device
++        )
++
++    def add_request(self, req_index: int, new_req_data: Any) -> None:
++        super().add_request(req_index, new_req_data)
++        self._req_id_to_index[new_req_data.req_id] = req_index
++        self.diffusion_states.add_request(req_index)
++        prompt_ids = getattr(new_req_data, "prompt_token_ids", None)
++        if prompt_ids is None:
++            prompt_ids = getattr(new_req_data, "prefill_token_ids", [])
++        self.diffusion_states.prompt_len[req_index] = len(prompt_ids)
++
++    def remove_request(self, req_id: str) -> None:
++        idx = self._req_id_to_index.pop(req_id, None)
++        if idx is not None:
++            self.diffusion_states.remove_request(idx)
++
++    def custom_sampler(self, sampler: Any) -> tuple[Any, Any] | None:
++        diffusion_config = getattr(self.vllm_config, "diffusion_config", None)
++        gen_config: Mapping[str, Any] = {}
++        if hasattr(self.model_config, "try_get_generation_config"):
++            gen_config = self.model_config.try_get_generation_config()
++        denoising_steps = (
++            diffusion_config.max_denoising_steps
++            if diffusion_config is not None
++            else None
++        ) or self.diffusion_states.canvas_length
++        return MinerUDiffusionSampler(
++            sampler,
++            diffusion_states=self.diffusion_states,
++            canvas_length=self.diffusion_states.canvas_length,
++            mask_token_id=self.diffusion_states.mask_token_id,
++            denoising_steps=denoising_steps,
++            dynamic_threshold=float(gen_config.get("dynamic_threshold", 0.85)),
++        ), None
++
++    def prepare_sample_hidden_states(
++        self,
++        hidden_states: torch.Tensor,
++        input_batch: Any,
++    ) -> tuple[torch.Tensor, torch.Tensor | None]:
++        if not _env_flag_enabled(_MASK_ONLY_SAMPLING_ENV):
++            return super().prepare_sample_hidden_states(hidden_states, input_batch)
++
++        logits_row_indices = _mineru_mask_only_logits_row_indices(
++            input_batch,
++            self.diffusion_states,
++            self.diffusion_states.mask_token_id,
++            hidden_states.device,
++        )
++        return hidden_states[input_batch.logits_indices[logits_row_indices]], (
++            logits_row_indices
++        )
++
++    def get_mm_embeddings(
++        self,
++        scheduled_encoder_inputs: dict[str, list[int]],
++        input_batch: Any,
++    ) -> torch.Tensor:
++        with record_function_or_nullcontext("mineru_mm_embeddings: prepare"):
++            mm_hashes, mm_kwargs = self.encoder_runner.prepare_mm_inputs(
++                scheduled_encoder_inputs
++            )
++
++        with record_function_or_nullcontext("mineru_mm_embeddings: encoder"):
++            if mm_kwargs:
++                encoder_outputs = self.encoder_runner.execute_mm_encoder(mm_kwargs)
++                self.encoder_cache.encoder_outputs.update(
++                    zip(mm_hashes, encoder_outputs)
++                )
++
++        with record_function_or_nullcontext("mineru_mm_embeddings: gather"):
++            mm_embeds, is_mm_embed = self.encoder_runner.gather_mm_embeddings(
++                input_batch.req_ids,
++                input_batch.num_tokens,
++                input_batch.num_scheduled_tokens,
++                input_batch.query_start_loc_np,
++                input_batch.prefill_len_np,
++                input_batch.num_computed_prefill_tokens_np,
++            )
++
++        with record_function_or_nullcontext("mineru_mm_embeddings: input_embeds"):
++            input_ids_unpadded = input_batch.input_ids[: input_batch.num_tokens]
++            inputs_embeds = self.encoder_runner.get_inputs_embeds(
++                input_ids_unpadded,
++                mm_embeds,
++                is_mm_embed,
++            )
++            return inputs_embeds[: input_batch.num_tokens_after_padding]
++
++    def prepare_attn(
++        self,
++        input_batch: Any,
++        cudagraph_mode: CUDAGraphMode,
++        block_tables: tuple[torch.Tensor, ...],
++        slot_mappings: torch.Tensor,
++        attn_groups: list[list[Any]],
++        kv_cache_config: Any,
++        for_capture: bool = False,
++    ) -> dict[str, Any]:
++        if cudagraph_mode == CUDAGraphMode.FULL:
++            num_reqs = input_batch.num_reqs_after_padding
++            num_tokens = input_batch.num_tokens_after_padding
++        else:
++            num_reqs = input_batch.num_reqs
++            num_tokens = input_batch.num_tokens
++
++        query_start_loc_cpu = torch.from_numpy(input_batch.query_start_loc_np)
++        max_query_len = input_batch.num_scheduled_tokens.max().item()
++        seq_lens_cpu_upper_bound = getattr(
++            input_batch, "seq_lens_cpu_upper_bound", None
++        )
++        if for_capture:
++            max_seq_len = self.max_model_len
++        elif seq_lens_cpu_upper_bound is not None:
++            max_seq_len = seq_lens_cpu_upper_bound[:num_reqs].max().item()
++        else:
++            max_seq_len = self.max_model_len
++
++        actual_num_reqs = input_batch.num_reqs
++        draft_counts = getattr(input_batch, "num_draft_tokens_per_req", None)
++        if draft_counts is None:
++            self._causal_buf[:actual_num_reqs] = True
++        else:
++            scheduled_canvas = torch.as_tensor(
++                draft_counts[:actual_num_reqs],
++                dtype=torch.int32,
++                device=self.device,
++            ) > 0
++            self._causal_buf[:actual_num_reqs] = ~scheduled_canvas
++        if actual_num_reqs < num_reqs:
++            self._causal_buf[actual_num_reqs:num_reqs] = False
++
++        return build_attn_metadata(
++            attn_groups=attn_groups,
++            num_reqs=num_reqs,
++            num_tokens=num_tokens,
++            query_start_loc_gpu=input_batch.query_start_loc,
++            query_start_loc_cpu=query_start_loc_cpu,
++            max_query_len=max_query_len,
++            seq_lens=input_batch.seq_lens,
++            max_seq_len=max_seq_len,
++            block_tables=block_tables,
++            slot_mappings=slot_mappings,
++            kv_cache_config=kv_cache_config,
++            seq_lens_cpu_upper_bound=seq_lens_cpu_upper_bound,
++            dcp_local_seq_lens=getattr(input_batch, "dcp_local_seq_lens", None),
++            positions=getattr(input_batch, "positions", None),
++            for_cudagraph_capture=for_capture,
++            causal=self._causal_buf[:num_reqs],
++        )
++
++
++def get_num_transfer_tokens(block_length: int, denoising_steps: int) -> list[int]:
++    """Return MinerU's uniform per-step transfer budget."""
++    if block_length <= 0:
++        raise ValueError(f"block_length must be positive, got {block_length}")
++    if denoising_steps <= 0:
++        raise ValueError(f"denoising_steps must be positive, got {denoising_steps}")
++
++    base = block_length // denoising_steps
++    remainder = block_length % denoising_steps
++    return [base + (1 if step < remainder else 0) for step in range(denoising_steps)]
++
++
++def sample_with_temperature_topk_topp(
++    logits: torch.Tensor,
++    *,
++    temperature: float = 1.0,
++    top_k: int = 0,
++    top_p: float = 1.0,
++) -> tuple[torch.Tensor, torch.Tensor]:
++    """Sample token ids and return sampled-token probability as confidence."""
++    if temperature <= 0:
++        token_ids = torch.argmax(logits, dim=-1)
++        probs = torch.softmax(logits.float(), dim=-1)
++        confidence = probs.gather(-1, token_ids.unsqueeze(-1)).squeeze(-1)
++        return token_ids, confidence
++
++    filtered = logits.float() / temperature
++    if top_k > 0 and top_k < filtered.shape[-1]:
++        kth = torch.topk(filtered, top_k, dim=-1).values[..., -1, None]
++        filtered = filtered.masked_fill(filtered < kth, float("-inf"))
++
++    if top_p < 1.0:
++        sorted_logits, sorted_indices = torch.sort(filtered, descending=True, dim=-1)
++        sorted_probs = torch.softmax(sorted_logits, dim=-1)
++        cumulative_probs = torch.cumsum(sorted_probs, dim=-1)
++        sorted_remove = cumulative_probs > top_p
++        sorted_remove[..., 1:] = sorted_remove[..., :-1].clone()
++        sorted_remove[..., 0] = False
++        remove = torch.zeros_like(sorted_remove).scatter(
++            -1, sorted_indices, sorted_remove
++        )
++        filtered = filtered.masked_fill(remove, float("-inf"))
++
++    probs = torch.softmax(filtered, dim=-1)
++    flat_probs = probs.reshape(-1, probs.shape[-1])
++    token_ids = torch.multinomial(flat_probs, num_samples=1).reshape(probs.shape[:-1])
++    confidence = probs.gather(-1, token_ids.unsqueeze(-1)).squeeze(-1)
++    return token_ids, confidence
++
++
++def select_transfer_indices(
++    confidence: torch.Tensor,
++    *,
++    threshold: float,
++    transfer_count: int,
++) -> torch.Tensor:
++    """Select positions transferred from sampled block output this step."""
++    if transfer_count < 0:
++        raise ValueError(f"transfer_count must be non-negative, got {transfer_count}")
++
++    selected = torch.zeros_like(confidence, dtype=torch.bool)
++    if transfer_count == 0:
++        return selected
++
++    batch = confidence.reshape(-1, confidence.shape[-1])
++    valid = torch.isfinite(batch)
++    high = ((confidence > threshold).reshape_as(batch)) & valid
++    out = selected.reshape_as(batch)
++
++    for row_idx in range(batch.shape[0]):
++        row_high = high[row_idx]
++        if int(row_high.sum().item()) >= transfer_count:
++            out[row_idx] = row_high
++        else:
++            valid_idx = torch.nonzero(valid[row_idx], as_tuple=False).flatten()
++            k = min(transfer_count, valid_idx.numel())
++            if k == 0:
++                continue
++            top_idx = torch.topk(batch[row_idx, valid_idx], k=k).indices
++            out[row_idx, valid_idx[top_idx]] = True
++    return selected
++
++
++class PatchMerger(nn.Module):
++
++    def __init__(self, dim: int, context_dim: int, spatial_merge_size: int = 2):
++        super().__init__()
++        self.hidden_size = context_dim * (spatial_merge_size**2)
++        self.ln_q = nn.LayerNorm(context_dim, eps=1e-6)
++        self.mlp = nn.Sequential(
++            nn.Linear(self.hidden_size, self.hidden_size),
++            nn.GELU(),
++            nn.Linear(self.hidden_size, dim),
++        )
++
++    def forward(self, x: torch.Tensor) -> torch.Tensor:
++        x = self.ln_q(x).view(-1, self.hidden_size)
++        return self.mlp(x)
++
++
++def build_projection(projection_type: str, in_dim: int, out_dim: int) -> nn.Module:
++    pm_match = re.match(r"(?:patch_merger|pm)(\d+)x$", projection_type)
++    if pm_match:
++        return PatchMerger(
++            out_dim,
++            in_dim,
++            spatial_merge_size=int(pm_match.group(1)),
++        )
++    raise ValueError(
++        "Only patch_merger-style MinerU projectors are supported, "
++        f"got: {projection_type}"
++    )
++
++
++class PerceiverProjection(nn.Module):
++
++    def __init__(self, projection_type: str, in_dim: int, out_dim: int):
++        super().__init__()
++        self.projection = build_projection(projection_type, in_dim, out_dim)
++
++    def forward(self, input_embeds: torch.Tensor) -> torch.Tensor:
++        return self.projection(input_embeds)
++
++
++class SDARRMSNorm(nn.Module):
++
++    def __init__(self, hidden_size: int, eps: float = 1e-6):
++        super().__init__()
++        self.weight = nn.Parameter(torch.ones(hidden_size))
++        self.variance_epsilon = eps
++
++    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
++        input_dtype = hidden_states.dtype
++        hidden_states = hidden_states.to(torch.float32)
++        variance = hidden_states.pow(2).mean(-1, keepdim=True)
++        hidden_states = hidden_states * torch.rsqrt(
++            variance + self.variance_epsilon
++        )
++        return self.weight * hidden_states.to(input_dtype)
++
++
++class SDARMLP(nn.Module):
++
++    def __init__(self, config: Any):
++        super().__init__()
++        self.gate_proj = nn.Linear(
++            config.hidden_size, config.intermediate_size, bias=False
++        )
++        self.up_proj = nn.Linear(
++            config.hidden_size, config.intermediate_size, bias=False
++        )
++        self.down_proj = nn.Linear(
++            config.intermediate_size, config.hidden_size, bias=False
++        )
++        self.act_fn = ACT2FN[config.hidden_act]
++
++    def forward(self, x: torch.Tensor) -> torch.Tensor:
++        return self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
++
++
++def rotate_half(x: torch.Tensor) -> torch.Tensor:
++    x1 = x[..., : x.shape[-1] // 2]
++    x2 = x[..., x.shape[-1] // 2 :]
++    return torch.cat((-x2, x1), dim=-1)
++
++
++def apply_rotary_pos_emb(
++    q: torch.Tensor,
++    k: torch.Tensor,
++    cos: torch.Tensor,
++    sin: torch.Tensor,
++    unsqueeze_dim: int = 1,
++) -> tuple[torch.Tensor, torch.Tensor]:
++    cos = cos.unsqueeze(unsqueeze_dim)
++    sin = sin.unsqueeze(unsqueeze_dim)
++    return (q * cos) + (rotate_half(q) * sin), (k * cos) + (rotate_half(k) * sin)
++
++
++class SDARRotaryEmbedding(nn.Module):
++
++    def __init__(self, config: Any):
++        super().__init__()
++        dim = getattr(
++            config,
++            "head_dim",
++            config.hidden_size // config.num_attention_heads,
++        )
++        base = float(getattr(config, "rope_theta", 10000.0))
++        inv_freq = 1.0 / (
++            base
++            ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim)
++        )
++        self.register_buffer("inv_freq", inv_freq, persistent=False)
++
++    def forward(
++        self,
++        x: torch.Tensor,
++        position_ids: torch.Tensor,
++    ) -> tuple[torch.Tensor, torch.Tensor]:
++        if position_ids.ndim == 1:
++            position_ids = position_ids.unsqueeze(0)
++        inv_freq = self.inv_freq.to(x.device)
++        inv_freq_expanded = inv_freq[None, :, None].float().expand(
++            position_ids.shape[0], -1, 1
++        )
++        position_ids_expanded = position_ids[:, None, :].float()
++        device_type = x.device.type if x.device.type != "mps" else "cpu"
++        with torch.autocast(device_type=device_type, enabled=False):
++            freqs = (
++                inv_freq_expanded @ position_ids_expanded
++            ).transpose(1, 2)
++            emb = torch.cat((freqs, freqs), dim=-1)
++            cos = emb.cos()
++            sin = emb.sin()
++        return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
++
++
++class SDARAttention(nn.Module):
++
++    def __init__(
++        self,
++        config: Any,
++        *,
++        cache_config: Any | None = None,
++        quant_config: Any | None = None,
++        prefix: str = "",
++    ):
++        super().__init__()
++        self.head_dim = getattr(
++            config,
++            "head_dim",
++            config.hidden_size // config.num_attention_heads,
++        )
++        self.num_heads = config.num_attention_heads
++        self.num_key_value_heads = config.num_key_value_heads
++        self.scaling = self.head_dim**-0.5
++        self.q_proj = nn.Linear(
++            config.hidden_size,
++            self.num_heads * self.head_dim,
++            bias=config.attention_bias,
++        )
++        self.k_proj = nn.Linear(
++            config.hidden_size,
++            self.num_key_value_heads * self.head_dim,
++            bias=config.attention_bias,
++        )
++        self.v_proj = nn.Linear(
++            config.hidden_size,
++            self.num_key_value_heads * self.head_dim,
++            bias=config.attention_bias,
++        )
++        self.o_proj = nn.Linear(
++            self.num_heads * self.head_dim,
++            config.hidden_size,
++            bias=config.attention_bias,
++        )
++        self.q_norm = SDARRMSNorm(self.head_dim, eps=config.rms_norm_eps)
++        self.k_norm = SDARRMSNorm(self.head_dim, eps=config.rms_norm_eps)
++        if cache_config is not None:
++            self.attn = Attention(
++                self.num_heads,
++                self.head_dim,
++                self.scaling,
++                num_kv_heads=self.num_key_value_heads,
++                cache_config=cache_config,
++                quant_config=quant_config,
++                prefix=f"{prefix}.attn",
++            )
++
++    def forward(
++        self,
++        hidden_states: torch.Tensor,
++        position_embeddings: tuple[torch.Tensor, torch.Tensor],
++        attention_mask: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        if hidden_states.ndim == 2 and hasattr(self, "attn"):
++            num_tokens = hidden_states.shape[0]
++            query_states = self.q_norm(
++                self.q_proj(hidden_states).view(
++                    num_tokens, self.num_heads, self.head_dim
++                )
++            )
++            key_states = self.k_norm(
++                self.k_proj(hidden_states).view(
++                    num_tokens, self.num_key_value_heads, self.head_dim
++                )
++            )
++            value_states = self.v_proj(hidden_states).view(
++                num_tokens, self.num_key_value_heads, self.head_dim
++            )
++            cos, sin = position_embeddings
++            if cos.ndim == 3 and cos.shape[0] == 1:
++                cos = cos.squeeze(0)
++                sin = sin.squeeze(0)
++            cos = cos.unsqueeze(1)
++            sin = sin.unsqueeze(1)
++            query_states = (query_states * cos) + (rotate_half(query_states) * sin)
++            key_states = (key_states * cos) + (rotate_half(key_states) * sin)
++            attn_output = self.attn(
++                query_states.reshape(num_tokens, -1),
++                key_states.reshape(num_tokens, -1),
++                value_states.reshape(num_tokens, -1),
++            )
++            return self.o_proj(attn_output.contiguous())
++
++        input_shape = hidden_states.shape[:-1]
++        query_shape = (*input_shape, self.num_heads, self.head_dim)
++        kv_shape = (*input_shape, self.num_key_value_heads, self.head_dim)
++        query_states = self.q_norm(
++            self.q_proj(hidden_states).view(query_shape)
++        ).transpose(1, 2)
++        key_states = self.k_norm(
++            self.k_proj(hidden_states).view(kv_shape)
++        ).transpose(1, 2)
++        value_states = self.v_proj(hidden_states).view(kv_shape).transpose(1, 2)
++        cos, sin = position_embeddings
++        query_states, key_states = apply_rotary_pos_emb(
++            query_states, key_states, cos, sin
++        )
++        attn_output = F.scaled_dot_product_attention(
++            query=query_states,
++            key=key_states,
++            value=value_states,
++            attn_mask=attention_mask.bool() if attention_mask is not None else None,
++            is_causal=False,
++            scale=self.scaling,
++            enable_gqa=True,
++        )
++        attn_output = attn_output.transpose(1, 2).reshape(*input_shape, -1)
++        return self.o_proj(attn_output.contiguous())
++
++
++class SDARDecoderLayer(nn.Module):
++
++    def __init__(
++        self,
++        config: Any,
++        *,
++        cache_config: Any | None = None,
++        quant_config: Any | None = None,
++        prefix: str = "",
++    ):
++        super().__init__()
++        self.self_attn = SDARAttention(
++            config=config,
++            cache_config=cache_config,
++            quant_config=quant_config,
++            prefix=maybe_prefix(prefix, "self_attn"),
++        )
++        self.mlp = SDARMLP(config)
++        self.input_layernorm = SDARRMSNorm(
++            config.hidden_size, eps=config.rms_norm_eps
++        )
++        self.post_attention_layernorm = SDARRMSNorm(
++            config.hidden_size, eps=config.rms_norm_eps
++        )
++
++    def forward(
++        self,
++        hidden_states: torch.Tensor,
++        position_embeddings: tuple[torch.Tensor, torch.Tensor],
++        attention_mask: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        residual = hidden_states
++        hidden_states = self.input_layernorm(hidden_states)
++        hidden_states = self.self_attn(
++            hidden_states=hidden_states,
++            position_embeddings=position_embeddings,
++            attention_mask=attention_mask,
++        )
++        hidden_states = residual + hidden_states
++        residual = hidden_states
++        hidden_states = self.post_attention_layernorm(hidden_states)
++        hidden_states = self.mlp(hidden_states)
++        return residual + hidden_states
++
++
++class SDARModel(nn.Module):
++
++    def __init__(
++        self,
++        config: Any,
++        *,
++        cache_config: Any | None = None,
++        quant_config: Any | None = None,
++        prefix: str = "",
++    ):
++        super().__init__()
++        self.config = config
++        self.uses_vllm_attention = cache_config is not None
++        self.padding_idx = getattr(config, "pad_token_id", None)
++        self.embed_tokens = nn.Embedding(
++            config.vocab_size, config.hidden_size, self.padding_idx
++        )
++        self.layers = nn.ModuleList(
++            [
++                SDARDecoderLayer(
++                    config,
++                    cache_config=cache_config,
++                    quant_config=quant_config,
++                    prefix=maybe_prefix(prefix, f"layers.{layer_idx}"),
++                )
++                for layer_idx in range(config.num_hidden_layers)
++            ]
++        )
++        self.norm = SDARRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
++        self.rotary_emb = SDARRotaryEmbedding(config=config)
++
++    def forward(
++        self,
++        input_ids: torch.Tensor | None = None,
++        inputs_embeds: torch.Tensor | None = None,
++        position_ids: torch.Tensor | None = None,
++        attention_mask: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        if (input_ids is None) == (inputs_embeds is None):
++            raise ValueError("Specify exactly one of input_ids or inputs_embeds")
++        if inputs_embeds is None:
++            inputs_embeds = self.embed_tokens(input_ids)
++        if inputs_embeds.ndim == 2 and not self.uses_vllm_attention:
++            inputs_embeds = inputs_embeds.unsqueeze(0)
++        if position_ids is None:
++            if inputs_embeds.ndim == 2:
++                position_ids = torch.arange(
++                    inputs_embeds.shape[0], device=inputs_embeds.device
++                )
++            else:
++                position_ids = torch.arange(
++                    inputs_embeds.shape[1], device=inputs_embeds.device
++                ).unsqueeze(0)
++        elif inputs_embeds.ndim == 3 and position_ids.ndim == 1:
++            position_ids = position_ids.unsqueeze(0)
++
++        hidden_states = inputs_embeds
++        position_embeddings = self.rotary_emb(hidden_states, position_ids)
++        for layer in self.layers:
++            hidden_states = layer(
++                hidden_states,
++                position_embeddings=position_embeddings,
++                attention_mask=attention_mask,
++            )
++        return self.norm(hidden_states)
++
++
++class SDARForCausalLM(nn.Module):
++
++    def __init__(
++        self,
++        config: Any,
++        *,
++        cache_config: Any | None = None,
++        quant_config: Any | None = None,
++        prefix: str = "",
++    ):
++        super().__init__()
++        self.config = config
++        self.uses_vllm_attention = cache_config is not None
++        self.model = SDARModel(
++            config,
++            cache_config=cache_config,
++            quant_config=quant_config,
++            prefix=maybe_prefix(prefix, "model"),
++        )
++        self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
++
++    def get_input_embeddings(self) -> nn.Embedding:
++        return self.model.embed_tokens
++
++    @staticmethod
++    def _build_block_attention_mask(
++        num_blocks: int,
++        block_length: int,
++        device: torch.device,
++    ) -> torch.Tensor:
++        block_mask = torch.tril(
++            torch.ones(num_blocks, num_blocks, device=device, dtype=torch.bool)
++        )
++        return block_mask.repeat_interleave(
++            block_length, dim=0
++        ).repeat_interleave(block_length, dim=1)
++
++    def _build_full_attention_mask(
++        self,
++        prompt_length: int,
++        gen_length: int,
++        block_length: int,
++        device: torch.device,
++    ) -> torch.Tensor:
++        prompt_blocks = (prompt_length + block_length - 1) // block_length
++        prompt_mask = self._build_block_attention_mask(
++            prompt_blocks, block_length, device
++        )
++        prompt_mask = prompt_mask[-prompt_length:, -prompt_length:]
++
++        gen_blocks = gen_length // block_length
++        gen_mask = self._build_block_attention_mask(
++            gen_blocks, block_length, device
++        )
++
++        full_mask = torch.zeros(
++            prompt_length + gen_length,
++            prompt_length + gen_length,
++            device=device,
++            dtype=torch.bool,
++        )
++        full_mask[:prompt_length, :prompt_length] = prompt_mask
++        full_mask[prompt_length:, :prompt_length] = True
++        full_mask[prompt_length:, prompt_length:] = gen_mask
++        return full_mask
++
++    def _initialize_generation_buffers(
++        self,
++        inputs_embeds: torch.Tensor,
++        gen_length: int,
++        mask_token_id: int,
++    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
++        batch_size, prompt_length, _ = inputs_embeds.shape
++        device = inputs_embeds.device
++        mask_token = torch.tensor([mask_token_id], device=device)
++        mask_embeds = self.get_input_embeddings()(mask_token)
++        generation_embeds = mask_embeds.unsqueeze(0).expand(
++            batch_size, gen_length, -1
++        )
++        x_embeds = torch.cat([inputs_embeds, generation_embeds], dim=1)
++        tokens = torch.full(
++            (batch_size, prompt_length + gen_length),
++            mask_token_id,
++            dtype=torch.long,
++            device=device,
++        )
++        step_map = torch.zeros_like(tokens, dtype=torch.int64)
++        step_time = torch.zeros_like(tokens, dtype=torch.float32)
++        return x_embeds, tokens, step_map, step_time
++
++    @staticmethod
++    def _prepare_stop_tokens(
++        stopping_criteria: Sequence[str] | None,
++        tokenizer: Any,
++        device: torch.device,
++    ) -> list[torch.Tensor]:
++        if stopping_criteria is None:
++            return []
++        if tokenizer is None:
++            raise ValueError("tokenizer is required when stopping_criteria is set")
++        return [
++            torch.tensor(
++                tokenizer.encode(stop, add_special_tokens=False),
++                device=device,
++            )
++            for stop in stopping_criteria
++        ]
++
++    @staticmethod
++    def _find_stop_position(
++        generated_tokens: torch.Tensor,
++        stop_tokens: Sequence[torch.Tensor],
++    ) -> int | None:
++        for stop_token in stop_tokens:
++            stop_len = stop_token.numel()
++            if stop_len == 0 or generated_tokens.numel() < stop_len:
++                continue
++            for end_idx in range(stop_len, generated_tokens.numel() + 1):
++                if torch.equal(
++                    generated_tokens[end_idx - stop_len:end_idx],
++                    stop_token,
++                ):
++                    return end_idx - stop_len
++        return None
++
++    @torch.no_grad()
++    def generate_with_embeds(
++        self,
++        inputs_embeds: torch.Tensor,
++        gen_length: int,
++        block_length: int,
++        mask_token_id: int,
++        denoising_steps: int = 8,
++        temperature: float = 1.0,
++        top_k: int = 0,
++        top_p: float = 1.0,
++        remasking_strategy: str = "low_confidence_dynamic",
++        dynamic_threshold: float = 0.85,
++        stopping_criteria: Sequence[str] | None = None,
++        tokenizer: Any = None,
++        **kwargs: Any,
++    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
++        if gen_length % block_length != 0:
++            raise ValueError(
++                f"gen_length({gen_length}) must be multiple of "
++                f"block_length({block_length})"
++            )
++        if remasking_strategy != "low_confidence_dynamic":
++            raise ValueError(
++                "Only remasking_strategy='low_confidence_dynamic' is supported."
++            )
++        if inputs_embeds.ndim != 3:
++            raise ValueError("inputs_embeds must have shape [batch, seq, hidden]")
++
++        prompt_length = inputs_embeds.shape[1]
++        gen_blocks = gen_length // block_length
++        full_attn_mask = self._build_full_attention_mask(
++            prompt_length,
++            gen_length,
++            block_length,
++            inputs_embeds.device,
++        )
++        position_ids = torch.arange(
++            prompt_length + gen_length,
++            device=inputs_embeds.device,
++        ).unsqueeze(0)
++        x_embeds, x, step_map, step_time = self._initialize_generation_buffers(
++            inputs_embeds,
++            gen_length,
++            mask_token_id,
++        )
++        num_transfer_tokens = get_num_transfer_tokens(block_length, denoising_steps)
++        stop_tokens = self._prepare_stop_tokens(
++            stopping_criteria, tokenizer, inputs_embeds.device
++        )
++        global_step = 0
++        found_stop = False
++        stop_pos = -1
++        stop_chunk_end = -1
++        start_time = time.perf_counter()
++
++        for block_idx in range(gen_blocks):
++            block_start = prompt_length + block_idx * block_length
++            block_end = prompt_length + (block_idx + 1) * block_length
++            cur_x = x[:, block_start:block_end]
++            cur_x_embeds = x_embeds[:, block_start:block_end, :]
++            cur_step_map = step_map[:, block_start:block_end]
++            cur_step_time = step_time[:, block_start:block_end]
++
++            for step in range(denoising_steps + 1):
++                mask_index = cur_x == mask_token_id
++                if int(mask_index.sum().item()) == 0:
++                    break
++
++                context_embeds = x_embeds[:, :block_end, :]
++                context_attn_mask = full_attn_mask[
++                    :block_end, :block_end
++                ].unsqueeze(0).unsqueeze(0)
++                context_position_ids = position_ids[:, :block_end]
++                hidden_states = self(
++                    input_ids=None,
++                    inputs_embeds=context_embeds,
++                    attention_mask=context_attn_mask,
++                    position_ids=context_position_ids,
++                )
++                logits = self.lm_head(hidden_states)[:, block_start:block_end, :]
++                sampled_ids, confidence = sample_with_temperature_topk_topp(
++                    logits,
++                    temperature=temperature,
++                    top_k=top_k,
++                    top_p=top_p,
++                )
++                confidence = torch.where(mask_index, confidence, -torch.inf)
++                transfer_index = select_transfer_indices(
++                    confidence,
++                    threshold=dynamic_threshold,
++                    transfer_count=num_transfer_tokens[
++                        min(step, denoising_steps - 1)
++                    ],
++                )
++                if int(transfer_index.sum().item()) == 0:
++                    break
++
++                global_step += 1
++                sampled_embeds = self.get_input_embeddings()(sampled_ids)
++                cur_x_embeds[transfer_index] = sampled_embeds[transfer_index]
++                cur_x[transfer_index] = sampled_ids[transfer_index]
++                cur_step_map[transfer_index] = global_step
++                cur_step_time[transfer_index] = time.perf_counter() - start_time
++
++            if stop_tokens:
++                generated = x[0, prompt_length:block_end]
++                stop_offset = self._find_stop_position(generated, stop_tokens)
++                if stop_offset is not None:
++                    found_stop = True
++                    stop_pos = prompt_length + stop_offset
++                    stop_chunk_end = block_end
++            if found_stop:
++                break
++
++        if found_stop:
++            x = x[:, :stop_pos]
++            step_map = step_map[:, :stop_chunk_end]
++            step_time = step_time[:, :stop_chunk_end]
++        return (
++            x[:, prompt_length:],
++            step_map[:, prompt_length:],
++            step_time[:, prompt_length:],
++        )
++
++    def embed_input_ids(
++        self,
++        input_ids: torch.Tensor,
++        multimodal_embeddings: MultiModalEmbeddings | None = None,
++        *,
++        is_multimodal: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        inputs_embeds = self.get_input_embeddings()(input_ids)
++        if multimodal_embeddings is None or len(multimodal_embeddings) == 0:
++            return inputs_embeds
++        if is_multimodal is None:
++            raise ValueError("is_multimodal is required with multimodal_embeddings")
++        return _merge_multimodal_embeddings(
++            inputs_embeds=inputs_embeds,
++            multimodal_embeddings=multimodal_embeddings,
++            is_multimodal=is_multimodal,
++        )
++
++    def forward(
++        self,
++        input_ids: torch.Tensor | None = None,
++        inputs_embeds: torch.Tensor | None = None,
++        position_ids: torch.Tensor | None = None,
++        attention_mask: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        return self.model(
++            input_ids=input_ids,
++            inputs_embeds=inputs_embeds,
++            position_ids=position_ids,
++            attention_mask=attention_mask,
++        )
++
++
++class MinerUDiffusionProcessingInfo(Qwen2VLProcessingInfo):
++
++    def get_hf_config(self):
++        return self.ctx.get_hf_config()
++
++    def get_supported_mm_limits(self) -> Mapping[str, int | None]:
++        return {"image": None}
++
++    def get_mm_max_tokens_per_item(
++        self,
++        seq_len: int,
++        mm_counts: Mapping[str, int],
++    ) -> Mapping[str, int]:
++        return {"image": self.get_max_image_tokens()}
++
++
++class MinerUDiffusionDummyInputsBuilder(
++    BaseDummyInputsBuilder[MinerUDiffusionProcessingInfo]
++):
++
++    def get_dummy_text(self, mm_counts: Mapping[str, int]) -> str:
++        num_images = mm_counts.get("image", 0)
++        hf_processor = self.info.get_hf_processor()
++        return hf_processor.image_token * num_images
++
++    def get_dummy_mm_data(
++        self,
++        seq_len: int,
++        mm_counts: Mapping[str, int],
++        mm_options: Mapping[str, BaseDummyOptions],
++    ) -> MultiModalDataDict:
++        num_images = mm_counts.get("image", 0)
++        target_width, target_height = self.info.get_image_size_with_most_features()
++        image_overrides = mm_options.get("image")
++        return {
++            "image": self._get_dummy_images(
++                width=target_width,
++                height=target_height,
++                num_images=num_images,
++                overrides=image_overrides,
++            ),
++        }
++
++
++class MinerUDiffusionMultiModalProcessor(
++    BaseMultiModalProcessor[MinerUDiffusionProcessingInfo]
++):
++
++    def _get_prompt_updates(
++        self,
++        mm_items: MultiModalDataItems,
++        hf_processor_mm_kwargs: Mapping[str, Any],
++        out_mm_kwargs: MultiModalKwargsItems,
++    ) -> Sequence[PromptUpdate]:
++        hf_processor = self.info.get_hf_processor(**hf_processor_mm_kwargs)
++        image_processor = self.info.get_image_processor(**hf_processor_mm_kwargs)
++        tokenizer = self.info.get_tokenizer()
++        image_token_id = tokenizer.get_vocab()[hf_processor.image_token]
++        merge_length = image_processor.merge_size**2
++
++        def get_replacement_mineru(item_idx: int):
++            out_item = out_mm_kwargs["image"][item_idx]
++            grid_thw = out_item["image_grid_thw"].data
++            assert isinstance(grid_thw, torch.Tensor)
++            num_tokens = int(grid_thw.prod()) // merge_length
++            return [image_token_id] * num_tokens
++
++        return [
++            PromptReplacement(
++                modality="image",
++                target=[image_token_id],
++                replacement=partial(get_replacement_mineru),
++            )
++        ]
++
++    def _get_mm_fields_config(
++        self,
++        hf_inputs: BatchFeature,
++        hf_processor_mm_kwargs: Mapping[str, object],
++    ) -> Mapping[str, MultiModalFieldConfig]:
++        return _create_qwen2vl_field_factory(
++            self.info.get_hf_config().vision_config.spatial_merge_size
++        )(hf_inputs)
++
++
++@MULTIMODAL_REGISTRY.register_processor(
++    MinerUDiffusionMultiModalProcessor,
++    info=MinerUDiffusionProcessingInfo,
++    dummy_inputs=MinerUDiffusionDummyInputsBuilder,
++)
++class MinerUDiffusionForConditionalGeneration(nn.Module, SupportsMultiModal):
++    """Registration anchor for native MinerU-Diffusion support."""
++
++    hf_to_vllm_mapper = WeightsMapper(
++        orig_to_new_prefix={
++            "model.language_model.": "language_model.",
++            "language_model.": "language_model.",
++            "model.visual.": "visual.",
++            "visual.": "visual.",
++        },
++    )
++
++    packed_modules_mapping = {
++        "qkv_proj": ["q_proj", "k_proj", "v_proj"],
++        "gate_up_proj": ["gate_proj", "up_proj"],
++    }
++
++    def __init__(self, *, vllm_config: VllmConfig, prefix: str = ""):
++        super().__init__()
++        self.config = vllm_config.model_config.hf_config
++        self.text_config = vllm_config.model_config.hf_text_config
++        self.prefix = prefix
++        self.vision_model = Qwen2VisionTransformerPretrainedModel._from_config(
++            self.config.vision_config
++        )
++        self.vision_model.merger = nn.Identity()
++        self.vision_abstractor = PerceiverProjection(
++            projection_type=self.config.vision_projector_type,
++            in_dim=self.config.vision_config.embed_dim,
++            out_dim=self.text_config.hidden_size,
++        )
++        in_runtime_config = get_current_vllm_config_or_none() is not None
++        cache_config = getattr(vllm_config, "cache_config", None)
++        quant_config = getattr(vllm_config, "quant_config", None)
++        self.language_model = SDARForCausalLM(
++            self.text_config,
++            cache_config=cache_config if in_runtime_config else None,
++            quant_config=quant_config,
++            prefix=maybe_prefix(prefix, "language_model"),
++        )
++
++    @staticmethod
++    def get_model_state_cls():
++        return MinerUDiffusionModelState
++
++    def embed_input_ids(
++        self,
++        input_ids: torch.Tensor,
++        multimodal_embeddings: MultiModalEmbeddings | None = None,
++        *,
++        is_multimodal: torch.Tensor | None = None,
++    ) -> torch.Tensor:
++        inputs_embeds = self.get_input_embeddings()(input_ids)
++        if multimodal_embeddings is None or len(multimodal_embeddings) == 0:
++            return inputs_embeds
++        if is_multimodal is None:
++            raise ValueError("is_multimodal is required with multimodal_embeddings")
++        return _merge_multimodal_embeddings(
++            inputs_embeds=inputs_embeds,
++            multimodal_embeddings=multimodal_embeddings,
++            is_multimodal=is_multimodal,
++        )
++
++    def get_input_embeddings(self) -> nn.Embedding:
++        return self.language_model.get_input_embeddings()
++
++    def get_language_model(self) -> nn.Module:
++        return self.language_model
++
++    def get_image_features(
++        self,
++        pixel_values: torch.Tensor,
++        image_grid_thw: torch.Tensor,
++    ) -> torch.Tensor:
++        self.vision_model.to(device=pixel_values.device, dtype=pixel_values.dtype)
++        image_grid_thw = image_grid_thw.to(device=pixel_values.device)
++        vision_outputs = self.vision_model(pixel_values, image_grid_thw)
++        if hasattr(vision_outputs, "last_hidden_state"):
++            vision_hidden_states = vision_outputs.last_hidden_state
++        elif isinstance(vision_outputs, (tuple, list)):
++            vision_hidden_states = vision_outputs[0]
++        else:
++            vision_hidden_states = vision_outputs
++        return self.vision_abstractor(vision_hidden_states)
++
++    def _merge_input_and_image_features(
++        self,
++        input_ids: torch.Tensor,
++        image_features: torch.Tensor | None,
++    ) -> torch.Tensor:
++        inputs_embeds = self.embed_input_ids(input_ids)
++        if image_features is None:
++            return inputs_embeds
++        vision_mask = input_ids == self.config.image_token_id
++        num_image_tokens = torch.count_nonzero(vision_mask).item()
++        num_image_features = image_features.shape[:-1].numel()
++        if num_image_tokens != num_image_features:
++            raise ValueError(
++                "vision token count mismatch: "
++                f"{num_image_tokens} vs {num_image_features}"
++            )
++        return torch.masked_scatter(
++            inputs_embeds,
++            vision_mask.unsqueeze(-1),
++            image_features.to(inputs_embeds.dtype).view(-1, image_features.size(-1)),
++        )
++
++    def embed_multimodal(self, **kwargs: object):
++        pixel_values = kwargs.get("pixel_values")
++        image_grid_thw = kwargs.get("image_grid_thw")
++        if pixel_values is None:
++            return []
++        if image_grid_thw is None:
++            raise ValueError("image_grid_thw is required with pixel_values")
++        assert isinstance(pixel_values, torch.Tensor)
++        assert isinstance(image_grid_thw, torch.Tensor)
++
++        image_features = self.get_image_features(pixel_values, image_grid_thw)
++        merge_size = self.config.vision_config.spatial_merge_size
++        sizes = (image_grid_thw.prod(-1) // merge_size // merge_size).tolist()
++        return tuple(image_features.split(sizes))
++
++    @torch.no_grad()
++    def generate(
++        self,
++        *,
++        input_ids: torch.Tensor,
++        pixel_values: torch.Tensor | None = None,
++        image_grid_thw: torch.Tensor | None = None,
++        **generate_kwargs: Any,
++    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
++        if input_ids.ndim == 1:
++            input_ids = input_ids.unsqueeze(0)
++        image_features = None
++        if pixel_values is not None:
++            if image_grid_thw is None:
++                raise ValueError("image_grid_thw is required with pixel_values")
++            image_features = self.get_image_features(pixel_values, image_grid_thw)
++        inputs_embeds = self._merge_input_and_image_features(
++            input_ids,
++            image_features,
++        )
++        return self.language_model.generate_with_embeds(
++            inputs_embeds=inputs_embeds,
++            **generate_kwargs,
++        )
++
++    def forward(
++        self,
++        input_ids: torch.Tensor | None,
++        positions: torch.Tensor,
++        inputs_embeds: torch.Tensor | None = None,
++        pixel_values: torch.Tensor | None = None,
++        image_grid_thw: torch.Tensor | None = None,
++        attention_mask: torch.Tensor | None = None,
++        **kwargs: Any,
++    ) -> torch.Tensor:
++        if inputs_embeds is None:
++            if input_ids is None:
++                raise ValueError("input_ids or inputs_embeds is required")
++            if input_ids.ndim == 1 and self.language_model.uses_vllm_attention:
++                model_input_ids = input_ids
++            elif input_ids.ndim == 1:
++                model_input_ids = input_ids.unsqueeze(0)
++            else:
++                model_input_ids = input_ids
++            image_features = None
++            if pixel_values is not None:
++                if image_grid_thw is None:
++                    raise ValueError("image_grid_thw is required with pixel_values")
++                image_features = self.get_image_features(pixel_values, image_grid_thw)
++            inputs_embeds = self._merge_input_and_image_features(
++                model_input_ids, image_features
++            )
++        elif inputs_embeds.ndim == 2 and not self.language_model.uses_vllm_attention:
++            inputs_embeds = inputs_embeds.unsqueeze(0)
++
++        if positions.ndim == 1 and not self.language_model.uses_vllm_attention:
++            position_ids = positions.unsqueeze(0)
++        else:
++            position_ids = positions
++
++        hidden_states = self.language_model(
++            input_ids=None,
++            inputs_embeds=inputs_embeds,
++            position_ids=position_ids,
++            attention_mask=attention_mask,
++        )
++        return hidden_states.reshape(-1, hidden_states.shape[-1])
++
++    def compute_logits(self, hidden_states: torch.Tensor) -> torch.Tensor | None:
++        return self.language_model.lm_head(hidden_states)
++
++    def load_weights(self, weights: Iterable[tuple[str, torch.Tensor]]) -> set[str]:
++        params = dict(self.named_parameters())
++        buffers = dict(self.named_buffers())
++        loaded: set[str] = set()
++        for name, weight in weights:
++            target = params.get(name)
++            if target is None:
++                target = buffers.get(name)
++            if target is None:
++                continue
++            with torch.no_grad():
++                target.copy_(weight.to(dtype=target.dtype, device=target.device))
++            loaded.add(name)
++        return loaded
+diff --git a/vllm/model_executor/models/registry.py b/vllm/model_executor/models/registry.py
+index ecd31f2dc..13bf47383 100644
+--- a/vllm/model_executor/models/registry.py
++++ b/vllm/model_executor/models/registry.py
+@@ -416,6 +416,10 @@ _MULTIMODAL_MODELS = {
+     "Glm4vForConditionalGeneration": ("glm4_1v", "Glm4vForConditionalGeneration"),
+     "Glm4vMoeForConditionalGeneration": ("glm4_1v", "Glm4vMoeForConditionalGeneration"),
+     "GlmOcrForConditionalGeneration": ("glm_ocr", "GlmOcrForConditionalGeneration"),
++    "MinerUDiffusionForConditionalGeneration": (
++        "mineru_diffusion",
++        "MinerUDiffusionForConditionalGeneration",
++    ),
+     "GraniteSpeechForConditionalGeneration": (
+         "granite_speech",
+         "GraniteSpeechForConditionalGeneration",
+diff --git a/vllm/transformers_utils/config.py b/vllm/transformers_utils/config.py
+index 2d8a32ef3..d5ae97a35 100644
+--- a/vllm/transformers_utils/config.py
++++ b/vllm/transformers_utils/config.py
+@@ -103,7 +103,9 @@ _CONFIG_REGISTRY: dict[str, type[PretrainedConfig]] = LazyConfigDict(
+     medusa="MedusaConfig",
+     mellum="MellumConfig",
+     midashenglm="MiDashengLMConfig",
++    mineru_diffusion="MinerUDiffusionConfig",
+     minimax_m3_vl="MiniMaxM3Config",
++    sdar="SDARConfig",
+     minimax_m3_mtp="MiniMaxM3MTPConfig",
+     moondream3="Moondream3Config",
+     eagle="EAGLEConfig",
+diff --git a/vllm/transformers_utils/configs/__init__.py b/vllm/transformers_utils/configs/__init__.py
+index 021eb2ea4..5060f2a0d 100644
+--- a/vllm/transformers_utils/configs/__init__.py
++++ b/vllm/transformers_utils/configs/__init__.py
+@@ -53,6 +53,7 @@ _CLASS_TO_MODULE: dict[str, str] = {
+     "MedusaConfig": "vllm.transformers_utils.configs.medusa",
+     "MellumConfig": "vllm.transformers_utils.configs.mellum",
+     "MiDashengLMConfig": "vllm.transformers_utils.configs.midashenglm",
++    "MinerUDiffusionConfig": "vllm.transformers_utils.configs.mineru_diffusion",
+     "MiniMaxM3Config": "vllm.transformers_utils.configs.minimax_m3",
+     "MiniMaxM3MTPConfig": "vllm.transformers_utils.configs.minimax_m3",
+     "MiniMaxM3TextConfig": "vllm.transformers_utils.configs.minimax_m3",
+@@ -79,6 +80,7 @@ _CLASS_TO_MODULE: dict[str, str] = {
+     "Step3p5Config": "vllm.transformers_utils.configs.step3p5",
+     "QianfanOCRConfig": "vllm.transformers_utils.configs.qianfan_ocr",
+     "QianfanOCRVisionConfig": "vllm.transformers_utils.configs.qianfan_ocr",
++    "SDARConfig": "vllm.transformers_utils.configs.mineru_diffusion",
+     "Qwen3ASRConfig": "vllm.transformers_utils.configs.qwen3_asr",
+     "Qwen3NextConfig": "vllm.transformers_utils.configs.qwen3_next",
+     "Qwen3_5Config": "vllm.transformers_utils.configs.qwen3_5",
+@@ -127,6 +129,7 @@ __all__ = [
+     "MedusaConfig",
+     "MellumConfig",
+     "MiDashengLMConfig",
++    "MinerUDiffusionConfig",
+     "MiniMaxM3Config",
+     "MiniMaxM3MTPConfig",
+     "MiniMaxM3TextConfig",
+@@ -153,6 +156,7 @@ __all__ = [
+     "Step3p5Config",
+     "QianfanOCRConfig",
+     "QianfanOCRVisionConfig",
++    "SDARConfig",
+     "Qwen3ASRConfig",
+     "Qwen3NextConfig",
+     "Qwen3_5Config",
+diff --git a/vllm/transformers_utils/configs/mineru_diffusion.py b/vllm/transformers_utils/configs/mineru_diffusion.py
+new file mode 100644
+index 000000000..fcaa1f090
+--- /dev/null
++++ b/vllm/transformers_utils/configs/mineru_diffusion.py
+@@ -0,0 +1,169 @@
++# SPDX-License-Identifier: Apache-2.0
++# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
++
++from typing import Any
++
++from transformers import PretrainedConfig
++from transformers.modeling_rope_utils import rope_config_validation
++from transformers.models.qwen2_vl.configuration_qwen2_vl import Qwen2VLVisionConfig
++
++
++class SDARConfig(PretrainedConfig):
++    """Text backbone config used by MinerU-Diffusion checkpoints."""
++
++    model_type = "sdar"
++    keys_to_ignore_at_inference = ["past_key_values"]
++
++    def __init__(
++        self,
++        vocab_size: int = 151936,
++        hidden_size: int = 2048,
++        intermediate_size: int = 6144,
++        num_hidden_layers: int = 28,
++        num_attention_heads: int = 16,
++        num_key_value_heads: int | None = 8,
++        head_dim: int = 128,
++        hidden_act: str = "silu",
++        max_position_embeddings: int = 32768,
++        initializer_range: float = 0.02,
++        rms_norm_eps: float = 1e-6,
++        use_cache: bool = True,
++        tie_word_embeddings: bool = False,
++        rope_theta: float = 1000000.0,
++        rope_scaling: dict[str, Any] | None = None,
++        attention_bias: bool = False,
++        use_sliding_window: bool = False,
++        sliding_window: int | None = None,
++        max_window_layers: int = 28,
++        attention_dropout: float = 0.0,
++        **kwargs: Any,
++    ):
++        self.vocab_size = vocab_size
++        self.max_position_embeddings = max_position_embeddings
++        self.hidden_size = hidden_size
++        self.intermediate_size = intermediate_size
++        self.num_hidden_layers = num_hidden_layers
++        self.num_attention_heads = num_attention_heads
++        self.num_key_value_heads = (
++            num_attention_heads if num_key_value_heads is None else num_key_value_heads
++        )
++        self.head_dim = head_dim
++        self.hidden_act = hidden_act
++        self.initializer_range = initializer_range
++        self.rms_norm_eps = rms_norm_eps
++        self.use_cache = use_cache
++        self.rope_theta = rope_theta
++        self.rope_scaling = rope_scaling
++        self.attention_bias = attention_bias
++        self.use_sliding_window = use_sliding_window
++        self.sliding_window = sliding_window
++        self.max_window_layers = max_window_layers
++        self.attention_dropout = attention_dropout
++        if self.rope_scaling is not None and "type" in self.rope_scaling:
++            self.rope_scaling["rope_type"] = self.rope_scaling["type"]
++        rope_config_validation(self)
++        super().__init__(tie_word_embeddings=tie_word_embeddings, **kwargs)
++
++
++class MinerUDiffusionConfig(PretrainedConfig):
++    """Config shim for MinerU-Diffusion checkpoints.
++
++    MinerU-Diffusion combines a Qwen2-VL vision encoder with an SDAR diffusion
++    language model.  vLLM uses this class to load checkpoints without
++    trust_remote_code and to derive native diffusion defaults.
++    """
++
++    model_type = "mineru_diffusion"
++    sub_configs = {"vision_config": Qwen2VLVisionConfig, "text_config": SDARConfig}
++    keys_to_ignore_at_inference = ["past_key_values"]
++    architectures = ["MinerUDiffusionForConditionalGeneration"]
++
++    def __init__(
++        self,
++        text_config: dict[str, Any] | PretrainedConfig | None = None,
++        vision_config: dict[str, Any] | PretrainedConfig | None = None,
++        language_model_config: dict[str, Any] | PretrainedConfig | None = None,
++        vision_model_config: dict[str, Any] | PretrainedConfig | None = None,
++        image_token_id: int = 151655,
++        video_token_id: int = 151656,
++        vision_start_token_id: int = 151652,
++        vision_end_token_id: int = 151653,
++        mask_token_id: int = 151669,
++        image_size: int = 512,
++        patch_size: int = 16,
++        downsample_ratio: float = 0.5,
++        vision_projector_type: str = "patch_merger2x",
++        vision_select_layer: int = -2,
++        canvas_length: int = 32,
++        tie_word_embeddings: bool = False,
++        **kwargs: Any,
++    ):
++        kwargs.pop("rm_vit_merger", None)
++        top_level_torch_dtype = kwargs.pop("torch_dtype", None)
++        text_config = text_config if text_config is not None else language_model_config
++        vision_config = (
++            vision_config if vision_config is not None else vision_model_config
++        )
++
++        if isinstance(text_config, dict):
++            self.text_config = SDARConfig(**text_config)
++        elif text_config is None:
++            self.text_config = SDARConfig()
++        else:
++            self.text_config = text_config
++
++        if isinstance(vision_config, dict):
++            vision_model_type = vision_config.get("model_type", "qwen2_vl")
++            if vision_model_type not in {"qwen2_vl", "qwen2_vl_vision"}:
++                raise ValueError(
++                    f"Unsupported MinerU-Diffusion vision config: "
++                    f"{vision_model_type!r}"
++                )
++            self.vision_config = Qwen2VLVisionConfig(**vision_config)
++        elif vision_config is None:
++            self.vision_config = Qwen2VLVisionConfig()
++        else:
++            self.vision_config = vision_config
++
++        self.image_token_id = image_token_id
++        self.video_token_id = video_token_id
++        self.vision_start_token_id = vision_start_token_id
++        self.vision_end_token_id = vision_end_token_id
++        self.mask_token_id = mask_token_id
++        self.image_size = image_size
++        self.patch_size = patch_size
++        self.downsample_ratio = downsample_ratio
++        self.vision_projector_type = vision_projector_type
++        self.vision_select_layer = vision_select_layer
++        self.canvas_length = canvas_length
++        self.tie_word_embeddings = tie_word_embeddings
++
++        super().__init__(
++            tie_word_embeddings=tie_word_embeddings,
++            bos_token_id=getattr(self.text_config, "bos_token_id", None),
++            eos_token_id=getattr(self.text_config, "eos_token_id", None),
++            pad_token_id=getattr(self.text_config, "pad_token_id", None),
++            **kwargs,
++        )
++        self.torch_dtype = getattr(
++            self.text_config, "torch_dtype", top_level_torch_dtype
++        )
++
++    @property
++    def language_model_config(self):
++        return self.text_config
++
++    @property
++    def vision_model_config(self):
++        return self.vision_config
++
++    @property
++    def vision_model_type(self):
++        return getattr(self.vision_config, "model_type", None)
++
++    @property
++    def hidden_size(self):
++        return self.text_config.hidden_size
++
++
++__all__ = ["MinerUDiffusionConfig", "SDARConfig"]
+diff --git a/vllm/v1/worker/gpu/model_runner.py b/vllm/v1/worker/gpu/model_runner.py
+index 43007d9cc..f4a6d884b 100644
+--- a/vllm/v1/worker/gpu/model_runner.py
++++ b/vllm/v1/worker/gpu/model_runner.py
+@@ -111,6 +111,7 @@ from vllm.v1.worker.gpu.spec_decode.speculator import DraftModelSpeculator
+ from vllm.v1.worker.gpu.spec_decode.utils import DraftTokensHandler
+ from vllm.v1.worker.gpu.states import RequestState
+ from vllm.v1.worker.gpu.structured_outputs import StructuredOutputsWorker
++from vllm.v1.utils import record_function_or_nullcontext
+ from vllm.v1.worker.lora_model_runner_mixin import LoRAModelRunnerMixin
+ from vllm.v1.worker.utils import KVBlockZeroer
+ 
+@@ -1035,40 +1036,68 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+         )
+         return block_tables, slot_mappings
+ 
+-    def sample(
++    def _sample_from_hidden_states(
+         self,
+         hidden_states: torch.Tensor,
+         input_batch: InputBatch,
+         grammar_output: GrammarOutput | None,
+     ) -> tuple[SamplerOutput, torch.Tensor, torch.Tensor]:
+-        sample_hidden_states = hidden_states[input_batch.logits_indices]
+-        logits = self.model.compute_logits(sample_hidden_states)
+-        if grammar_output is not None:
+-            # Apply grammar bitmask to the logits in-place.
+-            assert self.structured_outputs_worker is not None
+-            self.structured_outputs_worker.apply_grammar_bitmask(
+-                logits,
+-                input_batch,
+-                grammar_output.structured_output_request_ids,
+-                grammar_output.grammar_bitmask,
++        if grammar_output is None:
++            sample_hidden_states, logits_row_indices = (
++                self.model_state.prepare_sample_hidden_states(
++                    hidden_states,
++                    input_batch,
++                )
+             )
+-
+-        if input_batch.num_draft_tokens == 0 or self.rejection_sampler is None:
+-            assert self.sampler is not None
+-            sampler_output = self.sampler(logits, input_batch)
+         else:
+-            # Rejection sampling for spec decoding.
+-            assert self.rejection_sampler is not None
+-            assert self.speculator is not None
+-            sampler_output = self.rejection_sampler(
+-                logits,
+-                input_batch,
+-                # Draft logits are needed for probabilistic rejection sampling.
+-                self.speculator.draft_logits,
+-            )
++            sample_hidden_states = hidden_states[input_batch.logits_indices]
++            logits_row_indices = None
++
++        if logits_row_indices is not None:
++            input_batch.logits_row_indices = logits_row_indices  # type: ignore[attr-defined]
++        try:
++            logits = self.model.compute_logits(sample_hidden_states)
++            if grammar_output is not None:
++                # Apply grammar bitmask to the logits in-place.
++                assert self.structured_outputs_worker is not None
++                self.structured_outputs_worker.apply_grammar_bitmask(
++                    logits,
++                    input_batch,
++                    grammar_output.structured_output_request_ids,
++                    grammar_output.grammar_bitmask,
++                )
++
++            if input_batch.num_draft_tokens == 0 or self.rejection_sampler is None:
++                assert self.sampler is not None
++                sampler_output = self.sampler(logits, input_batch)
++            else:
++                # Rejection sampling for spec decoding.
++                assert self.rejection_sampler is not None
++                assert self.speculator is not None
++                sampler_output = self.rejection_sampler(
++                    logits,
++                    input_batch,
++                    # Draft logits are needed for probabilistic rejection sampling.
++                    self.speculator.draft_logits,
++                )
++        finally:
++            if logits_row_indices is not None:
++                del input_batch.logits_row_indices  # type: ignore[attr-defined]
+ 
+         return sampler_output, sampler_output.num_sampled, sampler_output.num_rejected
+ 
++    def sample(
++        self,
++        hidden_states: torch.Tensor,
++        input_batch: InputBatch,
++        grammar_output: GrammarOutput | None,
++    ) -> tuple[SamplerOutput, torch.Tensor, torch.Tensor]:
++        return self._sample_from_hidden_states(
++            hidden_states,
++            input_batch,
++            grammar_output,
++        )
++
+     def postprocess_sampled(
+         self,
+         idx_mapping: torch.Tensor,  # May include -1 for masked entries
+@@ -1109,12 +1138,15 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+     ) -> ModelRunnerOutput | IntermediateTensors | None:
+         if not dummy_run:
+             # Update the request states.
+-            self.update_pp_decode_requests()
+-            self.finish_requests(scheduler_output)
+-            self.free_states(scheduler_output)
+-            self.add_requests(scheduler_output)
+-            self.update_requests(scheduler_output)
+-            self.block_tables.apply_staged_writes()
++            with record_function_or_nullcontext(
++                "v2_gpu_model_runner: state_update"
++            ):
++                self.update_pp_decode_requests()
++                self.finish_requests(scheduler_output)
++                self.free_states(scheduler_output)
++                self.add_requests(scheduler_output)
++                self.update_requests(scheduler_output)
++                self.block_tables.apply_staged_writes()
+             if scheduler_output.total_num_scheduled_tokens == 0:
+                 # No need to run the model.
+                 empty_output = self.kv_connector.no_forward(scheduler_output)
+@@ -1140,16 +1172,17 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             # cross-attention cache with dynamic encoder outputs.
+             skip_compiled = True
+ 
+-        batch_desc, num_tokens_across_dp = dispatch_cg_and_sync_dp(
+-            self.cudagraph_manager,
+-            num_reqs,
+-            num_toks,
+-            uniform_tok_count,
+-            self.dp_size,
+-            self.dp_rank,
+-            need_eager=is_profile or skip_compiled,
+-            num_active_loras=num_active_loras,
+-        )
++        with record_function_or_nullcontext("v2_gpu_model_runner: dispatch"):
++            batch_desc, num_tokens_across_dp = dispatch_cg_and_sync_dp(
++                self.cudagraph_manager,
++                num_reqs,
++                num_toks,
++                uniform_tok_count,
++                self.dp_size,
++                self.dp_rank,
++                need_eager=is_profile or skip_compiled,
++                num_active_loras=num_active_loras,
++            )
+ 
+         if batch_desc.num_tokens == 0:
+             # All DP ranks have zero tokens to run.
+@@ -1159,8 +1192,14 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+         if not dummy_run:
+             # Common case.
+             # Prepare all the inputs and copy to the input buffers.
+-            input_batch = self.prepare_inputs(scheduler_output, batch_desc)
+-            block_tables, slot_mappings = self.prepare_attn(input_batch)
++            with record_function_or_nullcontext(
++                "v2_gpu_model_runner: prepare_inputs"
++            ):
++                input_batch = self.prepare_inputs(scheduler_output, batch_desc)
++            with record_function_or_nullcontext(
++                "v2_gpu_model_runner: prepare_attn"
++            ):
++                block_tables, slot_mappings = self.prepare_attn(input_batch)
+ 
+             if self.lora_config:
+                 # Activate LoRA adapters.
+@@ -1219,9 +1258,12 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+                     lora_state=self.lora_state,
+                     scheduled_encoder_inputs=scheduler_output.scheduled_encoder_inputs,
+                 )
+-            inputs_embeds = self.model_state.get_mm_embeddings(
+-                scheduler_output.scheduled_encoder_inputs, input_batch
+-            )
++            with record_function_or_nullcontext(
++                "v2_gpu_model_runner: mm_embeddings"
++            ):
++                inputs_embeds = self.model_state.get_mm_embeddings(
++                    scheduler_output.scheduled_encoder_inputs, input_batch
++                )
+ 
+         model_inputs = {
+             "input_ids": input_batch.input_ids,
+@@ -1249,44 +1291,45 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             model_inputs["intermediate_tensors"] = IntermediateTensors(new_tensors)
+             del intermediate_tensors
+ 
+-        # Run model.
+-        if batch_desc.cg_mode == CUDAGraphMode.FULL:
+-            # Use explicit cudagraph replay for FULL mode.
+-            # NOTE(woosuk): Here, we don't need to pass the input tensors,
+-            # because they are already copied to the CUDA graph input buffers.
+-            assert self.cudagraph_manager is not None
+-            self.kv_connector.pre_forward(scheduler_output)
+-            model_output = self.cudagraph_manager.run_fullgraph(batch_desc)
+-        else:
+-            # For piecewise and eager mode, just call model().
+-            batch_descriptor = BatchDescriptor(
+-                num_tokens=input_batch.num_tokens_after_padding,
+-                has_lora=self.lora_config is not None,
+-                num_active_loras=batch_desc.num_active_loras,
+-            )
+-
+-            with set_forward_context(
+-                attn_metadata,
+-                self.vllm_config,
+-                num_tokens=input_batch.num_tokens_after_padding,
+-                cudagraph_runtime_mode=batch_desc.cg_mode,
+-                num_tokens_across_dp=num_tokens_across_dp,
+-                batch_descriptor=batch_descriptor,
+-                slot_mapping=slot_mappings_by_layer,
+-                skip_compiled=skip_compiled,
+-            ):
++        with record_function_or_nullcontext("v2_gpu_model_runner: forward"):
++            # Run model.
++            if batch_desc.cg_mode == CUDAGraphMode.FULL:
++                # Use explicit cudagraph replay for FULL mode.
++                # NOTE(woosuk): Here, we don't need to pass the input tensors,
++                # because they are already copied to the CUDA graph input buffers.
++                assert self.cudagraph_manager is not None
+                 self.kv_connector.pre_forward(scheduler_output)
+-                if batch_desc.cg_mode == CUDAGraphMode.PIECEWISE:
+-                    # Run the PIECEWISE graph (compiled PW cudagraph or breakable
+-                    # cudagraph, chosen inside run_pw_graph). cg_mode is only
+-                    # PIECEWISE after the cudagraph manager exists.
+-                    assert self.cudagraph_manager is not None
+-                    model_output = self.cudagraph_manager.run_pw_graph(
+-                        self.model, model_inputs
+-                    )
+-                else:
+-                    # Eager (NONE): call the raw model directly.
+-                    model_output = self.model(**model_inputs)
++                model_output = self.cudagraph_manager.run_fullgraph(batch_desc)
++            else:
++                # For piecewise and eager mode, just call model().
++                batch_descriptor = BatchDescriptor(
++                    num_tokens=input_batch.num_tokens_after_padding,
++                    has_lora=self.lora_config is not None,
++                    num_active_loras=batch_desc.num_active_loras,
++                )
++
++                with set_forward_context(
++                    attn_metadata,
++                    self.vllm_config,
++                    num_tokens=input_batch.num_tokens_after_padding,
++                    cudagraph_runtime_mode=batch_desc.cg_mode,
++                    num_tokens_across_dp=num_tokens_across_dp,
++                    batch_descriptor=batch_descriptor,
++                    slot_mapping=slot_mappings_by_layer,
++                    skip_compiled=skip_compiled,
++                ):
++                    self.kv_connector.pre_forward(scheduler_output)
++                    if batch_desc.cg_mode == CUDAGraphMode.PIECEWISE:
++                        # Run the PIECEWISE graph (compiled PW cudagraph or breakable
++                        # cudagraph, chosen inside run_pw_graph). cg_mode is only
++                        # PIECEWISE after the cudagraph manager exists.
++                        assert self.cudagraph_manager is not None
++                        model_output = self.cudagraph_manager.run_pw_graph(
++                            self.model, model_inputs
++                        )
++                    else:
++                        # Eager (NONE): call the raw model directly.
++                        model_output = self.model(**model_inputs)
+ 
+         if self.is_last_pp_rank:
+             if self.use_aux_hidden_state_outputs:
+@@ -1308,6 +1351,9 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             input_batch=input_batch,
+             attn_metadata=attn_metadata,
+             slot_mappings_by_layer=slot_mappings_by_layer,
++            model_inputs=model_inputs,
++            num_tokens_across_dp=num_tokens_across_dp,
++            num_active_loras=num_active_loras,
+             hidden_states=hidden_states,
+             aux_hidden_states=aux_hidden_states,
+             finished_req_ids=finished_req_ids,
+@@ -1330,6 +1376,9 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+         input_batch = self.execute_model_state.input_batch
+         attn_metadata = self.execute_model_state.attn_metadata
+         slot_mappings_by_layer = self.execute_model_state.slot_mappings_by_layer
++        model_inputs = self.execute_model_state.model_inputs
++        num_tokens_across_dp = self.execute_model_state.num_tokens_across_dp
++        num_active_loras = self.execute_model_state.num_active_loras
+         hidden_states = self.execute_model_state.hidden_states
+         aux_hidden_states = self.execute_model_state.aux_hidden_states
+         finished_req_ids = self.execute_model_state.finished_req_ids
+@@ -1354,9 +1403,14 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             return ModelRunnerOutput.with_kv_conn_output_only(kv_connector_output)
+ 
+         # Last rank: sample tokens
+-        sampler_output, num_sampled, num_rejected = self.sample(
+-            hidden_states, input_batch, grammar_output
+-        )
++        assert hidden_states is not None
++
++        with record_function_or_nullcontext("v2_gpu_model_runner: sample_logits"):
++            sampler_output, num_sampled, num_rejected = self.sample(
++                hidden_states,
++                input_batch,
++                grammar_output,
++            )
+ 
+         if self.pp_handler is not None:
+             # Broadcast to non-last PP ranks (handles spec decode multi-token).
+@@ -1368,14 +1422,17 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             )
+ 
+         assert self.prompt_logprobs_worker is not None
+-        prompt_logprobs_dict = self.prompt_logprobs_worker.compute_prompt_logprobs(
+-            self.model.compute_logits,
+-            hidden_states,
+-            input_batch,
+-            self.req_states.all_token_ids.gpu,
+-            self.req_states.num_computed_tokens.gpu,
+-            self.req_states.prompt_len.np,
+-        )
++        with record_function_or_nullcontext(
++            "v2_gpu_model_runner: prompt_logprobs"
++        ):
++            prompt_logprobs_dict = self.prompt_logprobs_worker.compute_prompt_logprobs(
++                self.model.compute_logits,
++                hidden_states,
++                input_batch,
++                self.req_states.all_token_ids.gpu,
++                self.req_states.num_computed_tokens.gpu,
++                self.req_states.prompt_len.np,
++            )
+ 
+         # Prepare the model runner output.
+         model_runner_output = ModelRunnerOutput(
+@@ -1387,13 +1444,14 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+             prompt_logprobs_dict=prompt_logprobs_dict,  # type: ignore[arg-type]
+         )
+         # Start async output copy here so that it can overlap with speculator proposal.
+-        async_output = AsyncOutput(
+-            model_runner_output=model_runner_output,
+-            sampler_output=sampler_output,
+-            num_sampled_tokens=num_sampled,
+-            main_stream=self.main_stream,
+-            copy_stream=self.output_copy_stream,
+-        )
++        with record_function_or_nullcontext("v2_gpu_model_runner: async_output"):
++            async_output = AsyncOutput(
++                model_runner_output=model_runner_output,
++                sampler_output=sampler_output,
++                num_sampled_tokens=num_sampled,
++                main_stream=self.main_stream,
++                copy_stream=self.output_copy_stream,
++            )
+ 
+         mm_inputs: tuple[list[torch.Tensor], torch.Tensor] | None = None
+         if self.speculator is not None and self.speculator.supports_mm_inputs:
+@@ -1415,39 +1473,43 @@ class GPUModelRunner(LoRAModelRunnerMixin):
+         # ensuring that `copy_event` is recorded before calling postprocess.
+         # This sequencing may slightly reduce latency as async D2H copy does not
+         # need to wait for the postprocess to finish.
+-        self.postprocess_sampled(
+-            input_batch.idx_mapping,
+-            sampler_output.sampled_token_ids,
+-            num_sampled,
+-            num_rejected,
+-            input_batch.query_start_loc,
+-        )
+-
+-        if self.speculator is not None:
+-            assert self.sampler is not None
+-            # Let the target override the hidden state fed to the drafter
+-            # (e.g. DeepSeek V4 MTP needs the pre-hc_head residual). The
+-            # target returns a persistent buffer sized at max_num_batched_tokens;
+-            # slice to the active token count that propose() expects.
+-            spec_hidden_states = hidden_states
+-            if hasattr(self.model, "get_mtp_target_hidden_states"):
+-                pre_hc_hidden_states = self.model.get_mtp_target_hidden_states()
+-                spec_hidden_states = pre_hc_hidden_states[: hidden_states.shape[0]]  # type: ignore[union-attr]
+-            draft_tokens = self.speculator.propose(
+-                input_batch,
+-                attn_metadata,
+-                slot_mappings_by_layer,
+-                spec_hidden_states,
+-                aux_hidden_states,
++        with record_function_or_nullcontext(
++            "v2_gpu_model_runner: sample_postprocess"
++        ):
++            self.postprocess_sampled(
++                input_batch.idx_mapping,
++                sampler_output.sampled_token_ids,
+                 num_sampled,
+                 num_rejected,
+-                self.req_states.last_sampled_tokens,
+-                self.req_states.next_prefill_tokens,
+-                self.sampler.sampling_states.temperature.gpu,
+-                self.sampler.sampling_states.seeds.gpu,
+-                mm_inputs=mm_inputs,
++                input_batch.query_start_loc,
+             )
+-            self.req_states.draft_tokens[input_batch.idx_mapping] = draft_tokens
++
++        if self.speculator is not None:
++            with record_function_or_nullcontext("v2_gpu_model_runner: draft"):
++                assert self.sampler is not None
++                # Let the target override the hidden state fed to the drafter
++                # (e.g. DeepSeek V4 MTP needs the pre-hc_head residual). The
++                # target returns a persistent buffer sized at max_num_batched_tokens;
++                # slice to the active token count that propose() expects.
++                spec_hidden_states = hidden_states
++                if hasattr(self.model, "get_mtp_target_hidden_states"):
++                    pre_hc_hidden_states = self.model.get_mtp_target_hidden_states()
++                    spec_hidden_states = pre_hc_hidden_states[: hidden_states.shape[0]]  # type: ignore[union-attr]
++                draft_tokens = self.speculator.propose(
++                    input_batch,
++                    attn_metadata,
++                    slot_mappings_by_layer,
++                    spec_hidden_states,
++                    aux_hidden_states,
++                    num_sampled,
++                    num_rejected,
++                    self.req_states.last_sampled_tokens,
++                    self.req_states.next_prefill_tokens,
++                    self.sampler.sampling_states.temperature.gpu,
++                    self.sampler.sampling_states.seeds.gpu,
++                    mm_inputs=mm_inputs,
++                )
++                self.req_states.draft_tokens[input_batch.idx_mapping] = draft_tokens
+ 
+         if self.num_speculative_steps > 0:
+             # Spec-decode and diffusion LLMs both use draft tokens but the latter does
+@@ -1569,6 +1631,9 @@ class ExecuteModelState(NamedTuple):
+     input_batch: InputBatch
+     attn_metadata: dict[str, Any] | None
+     slot_mappings_by_layer: dict[str, torch.Tensor] | None
++    model_inputs: dict[str, Any]
++    num_tokens_across_dp: torch.Tensor | None
++    num_active_loras: int
+     hidden_states: torch.Tensor | None
+     aux_hidden_states: list[torch.Tensor] | None
+     finished_req_ids: set[str]
+diff --git a/vllm/v1/worker/gpu/model_states/interface.py b/vllm/v1/worker/gpu/model_states/interface.py
+index 86f28e08e..cd9c9ffca 100644
+--- a/vllm/v1/worker/gpu/model_states/interface.py
++++ b/vllm/v1/worker/gpu/model_states/interface.py
+@@ -64,6 +64,20 @@ class ModelState(ABC):
+     ) -> None:
+         return None
+ 
++    def prepare_sample_hidden_states(
++        self,
++        hidden_states: torch.Tensor,
++        input_batch: InputBatch,
++    ) -> tuple[torch.Tensor, torch.Tensor | None]:
++        """Select hidden states used by compute_logits.
++
++        The optional row-index tensor maps returned hidden states back to the
++        original flattened logits rows in ``input_batch``. Model-specific
++        samplers can use it to scatter compact logits back into request-local
++        positions.
++        """
++        return hidden_states[input_batch.logits_indices], None
++
+     @abstractmethod
+     def get_mm_embeddings(
+         self, scheduled_encoder_inputs: dict[str, list[int]], input_batch: InputBatch
+diff --git a/vllm/v1/worker/gpu/warmup.py b/vllm/v1/worker/gpu/warmup.py
+index 0da845a06..bba7a34ec 100644
+--- a/vllm/v1/worker/gpu/warmup.py
++++ b/vllm/v1/worker/gpu/warmup.py
+@@ -45,6 +45,8 @@ def warmup_kernels(
+ 
+     kv_cache_groups = model_runner.kv_cache_config.kv_cache_groups
+     num_kv_cache_groups = len(kv_cache_groups)
++    if num_kv_cache_groups == 0:
++        return
+ 
+     # Compute per-request block counts for each KV cache group.
+     group_block_sizes = [g.kv_cache_spec.block_size for g in kv_cache_groups]
+diff --git a/vllm/v1/worker/gpu_model_runner.py b/vllm/v1/worker/gpu_model_runner.py
+index b958ef79d..bee861099 100644
+--- a/vllm/v1/worker/gpu_model_runner.py
++++ b/vllm/v1/worker/gpu_model_runner.py
+@@ -508,6 +508,7 @@ class GPUModelRunner(
+             logprobs_mode=self.model_config.logprobs_mode,
+             use_fp64_gumbel=self.model_config.use_fp64_gumbel,
+         )
++        self.rejection_sampler = RejectionSampler(self.sampler, None, self.device)
+ 
+         self.eplb_state: EplbState | None = None
+         self._moe_model: MixtureOfExperts | None = None
+@@ -618,7 +619,6 @@ class GPUModelRunner(
+             self.rejection_sampler = RejectionSampler(
+                 self.sampler, self.speculative_config, self.device
+             )
+-
+         self.num_spec_tokens = 0
+         self.prev_num_spec_tokens = 0
+         self.valid_sampled_token_count_gpu: torch.Tensor | None = None
+-- 
+2.34.1
+

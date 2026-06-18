@@ -1,0 +1,118 @@
+{
+  "metrics": {
+    "layout_elapsed": 1.2647705390118062,
+    "num_blocks": 9,
+    "num_extracted_blocks": 8,
+    "markdown_chars": 2924,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>136 077 836 094<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>138 123 863 351<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>132 359 861 403<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>131 431 864 631<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>132 647 719 664<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>131 674 862 721<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>131 726 866 847<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>132 854 866 902<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>493 939 506 952<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "Figure 2: Overview of the document OCR inverse rendering process via different decoding methods. The model maps a 2D document image to a 1D token sequence for decoding through autoregressive and diffusion-based methods.\n\nDocument OCR can be framed as posterior inference over a latent structured token sequence, where the input document \\( x \\) serves as partial and noisy evidence, constraining both token identities and spatial positioning. Traditional OCR systems typically parameterize the posterior through autoregressive decompositions [29, 7, 47, 16], which impose a fixed causal order and limit the ability to model document structure globally. In contrast, as illustrated in Figure 2, diffusion-based decoding methods [2, 27] introduce a discrete diffusion process that avoids a fixed causal ordering, enabling global iterative refinement under visual conditioning, which naturally aligns with the structural properties of OCR tasks. The conditional independence assumption inherent in masked diffusion models [27]—i.e., each token can be independently predicted given the input and partially observed sequence—becomes particularly reasonable in OCR, where the target text has a one-to-one correspondence with the text in the image. Through multiple denoising iterations, diffusion models jointly update all tokens across the entire sequence, circumventing the single-pass update limitation of autoregressive decoding, and providing a more structurally aligned approximation to the posterior distribution \\( p(y \\mid x) \\).\n\n3.2 MinerU-Diffusion: Unified Diffusion Architecture for OCR\n\nA straightforward implementation of discrete diffusion for OCR is to apply a full-attention dLM [27, 52, 54] over the entire token sequence at each denoising step. However, when scaling to long structured documents, such a design suffers from fundamental structural limitations and limitations [49].\n\nFull self-attention incurs complexity complexity \\( O(L^2) \\) with respect to sequence length \\( L \\), making it computationally expensive for long structured documents with thousands of tokens. Moreover, full-attention diffusion operates globally, which introduces positional instability as early denoising errors can propagate across the sequence. Unlike autoregressive decoding [1], global diffusion lacks structural anchoring and is prone to long-range drift. Additionally, document structures exhibit strong locality, with high intra-region consistency and weak long-range dependencies. Full-attention unnecessarily couples independent regions, conflicting with the spatially constrained posterior structure of document OCR.\n\nThese observations suggest that purely full-attention diffusion is not structurally aligned with OCR. To address these limitations, we introduce MinerU-Diffusion, a block-attention [2, 4] dVLM that incorporates structural locality into posterior refinement, as illustrated in Figure 3. The output",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.136,
+        0.077,
+        0.836,
+        0.094
+      ],
+      "angle": 0,
+      "content": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion Decoding"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.138,
+        0.123,
+        0.863,
+        0.351
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.132,
+        0.359,
+        0.861,
+        0.403
+      ],
+      "angle": 0,
+      "content": "Figure 2: Overview of the document OCR inverse rendering process via different decoding methods. The model maps a 2D document image to a 1D token sequence for decoding through autoregressive and diffusion-based methods."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.131,
+        0.431,
+        0.864,
+        0.631
+      ],
+      "angle": 0,
+      "content": "Document OCR can be framed as posterior inference over a latent structured token sequence, where the input document \\( x \\) serves as partial and noisy evidence, constraining both token identities and spatial positioning. Traditional OCR systems typically parameterize the posterior through autoregressive decompositions [29, 7, 47, 16], which impose a fixed causal order and limit the ability to model document structure globally. In contrast, as illustrated in Figure 2, diffusion-based decoding methods [2, 27] introduce a discrete diffusion process that avoids a fixed causal ordering, enabling global iterative refinement under visual conditioning, which naturally aligns with the structural properties of OCR tasks. The conditional independence assumption inherent in masked diffusion models [27]—i.e., each token can be independently predicted given the input and partially observed sequence—becomes particularly reasonable in OCR, where the target text has a one-to-one correspondence with the text in the image. Through multiple denoising iterations, diffusion models jointly update all tokens across the entire sequence, circumventing the single-pass update limitation of autoregressive decoding, and providing a more structurally aligned approximation to the posterior distribution \\( p(y \\mid x) \\)."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.132,
+        0.647,
+        0.719,
+        0.664
+      ],
+      "angle": 0,
+      "content": "3.2 MinerU-Diffusion: Unified Diffusion Architecture for OCR"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.131,
+        0.674,
+        0.862,
+        0.721
+      ],
+      "angle": 0,
+      "content": "A straightforward implementation of discrete diffusion for OCR is to apply a full-attention dLM [27, 52, 54] over the entire token sequence at each denoising step. However, when scaling to long structured documents, such a design suffers from fundamental structural limitations and limitations [49]."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.131,
+        0.726,
+        0.866,
+        0.847
+      ],
+      "angle": 0,
+      "content": "Full self-attention incurs complexity complexity \\( O(L^2) \\) with respect to sequence length \\( L \\), making it computationally expensive for long structured documents with thousands of tokens. Moreover, full-attention diffusion operates globally, which introduces positional instability as early denoising errors can propagate across the sequence. Unlike autoregressive decoding [1], global diffusion lacks structural anchoring and is prone to long-range drift. Additionally, document structures exhibit strong locality, with high intra-region consistency and weak long-range dependencies. Full-attention unnecessarily couples independent regions, conflicting with the spatially constrained posterior structure of document OCR."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.132,
+        0.854,
+        0.866,
+        0.902
+      ],
+      "angle": 0,
+      "content": "These observations suggest that purely full-attention diffusion is not structurally aligned with OCR. To address these limitations, we introduce MinerU-Diffusion, a block-attention [2, 4] dVLM that incorporates structural locality into posterior refinement, as illustrated in Figure 3. The output"
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.493,
+        0.939,
+        0.506,
+        0.952
+      ],
+      "angle": 0,
+      "content": "6"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_diffusion_paper_p0006/markdown_1781747319.md"
+}

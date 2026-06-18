@@ -1,0 +1,10 @@
+{
+  "vllm_repo": "<VLLM_PR_REPO>",
+  "vllm_commit": "7f6e10e357a46f05572184b53745bf457ccf09e9",
+  "mineru_repo": "<MINERU_HARNESS_PR_REPO>",
+  "mineru_commit": "b88a65d893b6da86f29fadcec88960e2b0956cda",
+  "model_path": "<MODEL_PATH>/MinerU-Diffusion-V1-0320-2.5B",
+  "manifest": "<REPORT_REPO>/manifests/pdf_suite_coverage/manifest.json",
+  "endpoint": "http://<VLLM_HOST>:<PORT>/v1/chat/completions",
+  "gpu": "0"
+}

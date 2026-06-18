@@ -1,0 +1,4884 @@
+From b88a65d893b6da86f29fadcec88960e2b0956cda Mon Sep 17 00:00:00 2001
+From: HuXinjing <49928618+HuXinjing@users.noreply.github.com>
+Date: Thu, 18 Jun 2026 09:40:30 +0800
+Subject: [PATCH] test(diffusion): add MinerU-Diffusion benchmark harness
+
+---
+ benchmarks/__init__.py                        |    1 +
+ benchmarks/mineru_diffusion/README.md         |  126 ++
+ benchmarks/mineru_diffusion/__init__.py       |    1 +
+ .../mineru_diffusion/bench_hf_server.py       |  161 +++
+ .../mineru_diffusion/compare_results.py       |  348 ++++++
+ benchmarks/mineru_diffusion/end2end_openai.py |  883 ++++++++++++++
+ benchmarks/mineru_diffusion/end2end_suite.py  | 1018 +++++++++++++++++
+ benchmarks/mineru_diffusion/harness.py        |  154 +++
+ benchmarks/mineru_diffusion/hf_server.py      |  207 ++++
+ .../layout_sampling_experiment.py             |  503 ++++++++
+ benchmarks/mineru_diffusion/native_server.py  |  244 ++++
+ .../mineru_diffusion/run_native_benchmark.py  |  188 +++
+ .../test_mineru_diffusion_end2end_openai.py   |  238 ++++
+ .../test_mineru_diffusion_end2end_suite.py    |  229 ++++
+ .../test_mineru_diffusion_harness.py          |  452 ++++++++
+ 15 files changed, 4753 insertions(+)
+ create mode 100644 benchmarks/__init__.py
+ create mode 100644 benchmarks/mineru_diffusion/README.md
+ create mode 100644 benchmarks/mineru_diffusion/__init__.py
+ create mode 100644 benchmarks/mineru_diffusion/bench_hf_server.py
+ create mode 100644 benchmarks/mineru_diffusion/compare_results.py
+ create mode 100644 benchmarks/mineru_diffusion/end2end_openai.py
+ create mode 100644 benchmarks/mineru_diffusion/end2end_suite.py
+ create mode 100644 benchmarks/mineru_diffusion/harness.py
+ create mode 100644 benchmarks/mineru_diffusion/hf_server.py
+ create mode 100644 benchmarks/mineru_diffusion/layout_sampling_experiment.py
+ create mode 100644 benchmarks/mineru_diffusion/native_server.py
+ create mode 100644 benchmarks/mineru_diffusion/run_native_benchmark.py
+ create mode 100644 tests/benchmarks/test_mineru_diffusion_end2end_openai.py
+ create mode 100644 tests/benchmarks/test_mineru_diffusion_end2end_suite.py
+ create mode 100644 tests/benchmarks/test_mineru_diffusion_harness.py
+
+diff --git a/benchmarks/__init__.py b/benchmarks/__init__.py
+new file mode 100644
+index 00000000..78ba3a5e
+--- /dev/null
++++ b/benchmarks/__init__.py
+@@ -0,0 +1 @@
++"""Benchmark helpers for MinerU development."""
+diff --git a/benchmarks/mineru_diffusion/README.md b/benchmarks/mineru_diffusion/README.md
+new file mode 100644
+index 00000000..4e8163e1
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/README.md
+@@ -0,0 +1,126 @@
++# MinerU-Diffusion Benchmark Harness
++
++This directory contains a small benchmark harness for MinerU-Diffusion style
++OpenAI-compatible OCR endpoints. It is intentionally separated from model
++runtime code so it can be used with vLLM, HF remote-code servers, or other
++compatible services.
++
++The harness covers four use cases:
++
++- single-image text/table/formula/layout requests;
++- end-to-end two-step page parsing, layout first and content extraction second;
++- PDF-page suite rendering and batch throughput measurement;
++- output quality comparison, including markdown similarity and layout box F1.
++
++## Single-Image Benchmark
++
++Start a compatible server, then run the default four tasks:
++
++```bash
++python -m benchmarks.mineru_diffusion.bench_hf_server \
++  --endpoint http://127.0.0.1:18083/v1/chat/completions \
++  --image file:///path/to/page.png \
++  --output-dir benchmark_results/mineru_diffusion/single_image \
++  --timeout 600
++```
++
++To cap individual task budgets:
++
++```bash
++python -m benchmarks.mineru_diffusion.bench_hf_server \
++  --endpoint http://127.0.0.1:18083/v1/chat/completions \
++  --image file:///path/to/page.png \
++  --output-dir benchmark_results/mineru_diffusion/single_image_budgeted \
++  --task-max-tokens text=1024,table=1024,formula=768,layout=128
++```
++
++Results are written as JSONL plus `latest_summary.json` under the selected
++output directory.
++
++## Native HF Remote-Code Helper
++
++For local HF remote-code smoke tests, the helper below starts the bundled
++compatibility server, waits for `/health`, runs the client, and shuts it down:
++
++```bash
++python -m benchmarks.mineru_diffusion.run_native_benchmark \
++  --cuda-visible-devices 0 \
++  --model-path /path/to/MinerU-Diffusion-V1-0320-2.5B \
++  --image file:///path/to/page.png \
++  --output-dir benchmark_results/mineru_diffusion/native_direct
++```
++
++The lower-level server can also be started manually:
++
++```bash
++CUDA_VISIBLE_DEVICES=0 python -m benchmarks.mineru_diffusion.native_server \
++  --model-path /path/to/MinerU-Diffusion-V1-0320-2.5B \
++  --host 127.0.0.1 \
++  --port 18083 \
++  --device cuda:0 \
++  --dtype bfloat16
++```
++
++`hf_server.py` provides the same OpenAI-compatible surface for an HF
++remote-code reference path.
++
++## PDF-Page Suite
++
++Render a manifest from local PDFs:
++
++```bash
++python -m benchmarks.mineru_diffusion.end2end_suite \
++  render \
++  --output-dir benchmark_results/mineru_diffusion/pdf_suite_coverage
++```
++
++Run a two-step parse against an OpenAI-compatible endpoint:
++
++```bash
++python -m benchmarks.mineru_diffusion.end2end_suite \
++  run \
++  --manifest benchmark_results/mineru_diffusion/pdf_suite_coverage/manifest.json \
++  --endpoint http://127.0.0.1:18083/v1/chat/completions \
++  --output-dir benchmark_results/mineru_diffusion/pdf_suite_dllm \
++  --layout-concurrency 4 \
++  --content-concurrency 4 \
++  --dynamic-threshold 0.90
++```
++
++The suite records page-level latency, layout output, extracted blocks, markdown,
++and aggregate summary metrics.
++
++## Quality Comparison
++
++Compare a candidate result file against a baseline:
++
++```bash
++python -m benchmarks.mineru_diffusion.compare_results \
++  --baseline benchmark_results/mineru_diffusion/baseline/latest_results.jsonl \
++  --candidate benchmark_results/mineru_diffusion/candidate/latest_results.jsonl \
++  --output benchmark_results/mineru_diffusion/compare.json \
++  --similarity-cases text,table \
++  --min-similarity 0.95 \
++  --max-control-repeat 8
++```
++
++The comparison report includes character-level similarity, output length ratio,
++control-token ratio, longest repeated control-token run, and layout box
++precision/recall/F1 for layout cases.
++
++## Layout Sampling Experiment
++
++`layout_sampling_experiment.py` compares default sampling against MinerU-style
++deterministic layout sampling for the layout stage:
++
++```bash
++python -m benchmarks.mineru_diffusion.layout_sampling_experiment \
++  --manifest benchmark_results/mineru_diffusion/pdf_suite_coverage/manifest.json \
++  --endpoint http://127.0.0.1:18083/v1/chat/completions \
++  --baseline-results benchmark_results/mineru_diffusion/baseline/latest_results.jsonl \
++  --output-dir benchmark_results/mineru_diffusion/layout_sampling_experiment \
++  --layout-concurrency 4 \
++  --dynamic-threshold 0.90
++```
++
++The experiment writes per-variant JSONL files and a markdown summary.
+diff --git a/benchmarks/mineru_diffusion/__init__.py b/benchmarks/mineru_diffusion/__init__.py
+new file mode 100644
+index 00000000..53fa6354
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/__init__.py
+@@ -0,0 +1 @@
++"""MinerU-Diffusion benchmark helpers."""
+diff --git a/benchmarks/mineru_diffusion/bench_hf_server.py b/benchmarks/mineru_diffusion/bench_hf_server.py
+new file mode 100644
+index 00000000..62f93f88
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/bench_hf_server.py
+@@ -0,0 +1,161 @@
++from __future__ import annotations
++
++import argparse
++import json
++import time
++from pathlib import Path
++from typing import Any
++
++import requests
++
++from benchmarks.mineru_diffusion.harness import (
++    BenchmarkResult,
++    STOP_STRINGS,
++    read_cases,
++    summarize_results,
++    write_default_cases,
++)
++
++
++def _extract_output(payload: dict[str, Any]) -> str:
++    return payload["choices"][0]["message"]["content"]
++
++
++def create_session() -> requests.Session:
++    session = requests.Session()
++    session.trust_env = False
++    return session
++
++
++def build_request_payload(case: dict[str, Any]) -> dict[str, Any]:
++    block_size = case.get("block_size", 32)
++    dynamic_threshold = case.get("dynamic_threshold", 0.95)
++    vllm_xargs = {
++        "block_size": block_size,
++        "dynamic_threshold": dynamic_threshold,
++    }
++    payload = {
++        "model": case.get("model", "mineru-diffusion"),
++        "messages": case["messages"],
++        "max_tokens": case.get("max_tokens", 1024),
++        "temperature": case.get("temperature", 1.0),
++        "stop": case.get("stop", list(STOP_STRINGS)),
++        "block_size": block_size,
++        "dynamic_threshold": dynamic_threshold,
++        "vllm_xargs": vllm_xargs,
++    }
++    if "max_denoising_steps" in case:
++        max_denoising_steps = int(case["max_denoising_steps"])
++        payload["max_denoising_steps"] = max_denoising_steps
++        vllm_xargs["max_denoising_steps"] = max_denoising_steps
++    return payload
++
++
++def parse_task_max_tokens(value: str) -> dict[str, int]:
++    if not value:
++        return {}
++    parsed: dict[str, int] = {}
++    for part in value.split(","):
++        if not part:
++            continue
++        task, sep, raw_tokens = part.partition("=")
++        if not sep or not task:
++            raise ValueError(
++                "--task-max-tokens entries must use task=tokens format"
++            )
++        parsed[task] = int(raw_tokens)
++    return parsed
++
++
++def run_case(endpoint: str, case: dict[str, Any], timeout: float) -> BenchmarkResult:
++    case_id = str(case.get("case_id", "unknown"))
++    request_payload = build_request_payload(case)
++    started = time.perf_counter()
++    try:
++        response = create_session().post(endpoint, json=request_payload, timeout=timeout)
++        latency = time.perf_counter() - started
++        response.raise_for_status()
++        return BenchmarkResult(
++            case_id=case_id,
++            ok=True,
++            latency_s=latency,
++            output_text=_extract_output(response.json()),
++            error=None,
++        )
++    except Exception as exc:
++        return BenchmarkResult(
++            case_id=case_id,
++            ok=False,
++            latency_s=time.perf_counter() - started,
++            output_text="",
++            error=str(exc),
++        )
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--endpoint", default="http://127.0.0.1:18082/v1/chat/completions")
++    parser.add_argument("--cases-jsonl", type=Path, default=None)
++    parser.add_argument("--write-default-cases", type=Path, default=None)
++    parser.add_argument(
++        "--image",
++        default=None,
++        help="image URL used when generating default text/table/formula/layout cases",
++    )
++    parser.add_argument("--output-dir", type=Path, default=Path("benchmark_results/mineru_diffusion"))
++    parser.add_argument("--timeout", type=float, default=600.0)
++    parser.add_argument(
++        "--task-max-tokens",
++        default="",
++        help="comma-separated task=tokens overrides for generated default cases",
++    )
++    return parser.parse_args()
++
++
++def main() -> None:
++    args = parse_args()
++    if (
++        args.cases_jsonl is None
++        or args.write_default_cases is not None
++    ) and args.image is None:
++        raise SystemExit("--image is required when generating default cases")
++
++    if args.write_default_cases is not None:
++        write_default_cases(
++            args.write_default_cases,
++            args.image,
++            task_max_tokens=parse_task_max_tokens(args.task_max_tokens),
++        )
++        print(f"wrote {args.write_default_cases}")
++        return
++
++    cases_path = args.cases_jsonl
++    if cases_path is None:
++        cases_path = args.output_dir / "default_cases.jsonl"
++        write_default_cases(
++            cases_path,
++            args.image,
++            task_max_tokens=parse_task_max_tokens(args.task_max_tokens),
++        )
++
++    args.output_dir.mkdir(parents=True, exist_ok=True)
++    cases = read_cases(cases_path)
++    results = [run_case(args.endpoint, case, args.timeout) for case in cases]
++    summary = summarize_results(results)
++
++    results_path = args.output_dir / f"results_{int(time.time())}.jsonl"
++    summary_path = args.output_dir / "latest_summary.json"
++    results_path.write_text(
++        "".join(result.to_json() + "\n" for result in results),
++        encoding="utf-8",
++    )
++    summary_path.write_text(
++        json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
++        encoding="utf-8",
++    )
++    print(json.dumps(summary, indent=2, ensure_ascii=False))
++    print(f"results: {results_path}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/benchmarks/mineru_diffusion/compare_results.py b/benchmarks/mineru_diffusion/compare_results.py
+new file mode 100644
+index 00000000..33ea2f5d
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/compare_results.py
+@@ -0,0 +1,348 @@
++from __future__ import annotations
++
++import argparse
++import json
++import re
++from dataclasses import asdict, dataclass
++from difflib import SequenceMatcher
++from pathlib import Path
++from typing import Any
++
++
++CONTROL_TOKEN_RE = re.compile(r"<\|[^>]+?\|>|<[a-z]+>")
++LAYOUT_RE = re.compile(
++    r"<\|box_start\|>\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s*"
++    r"<\|box_end\|>\s*<\|ref_start\|>\s*([^<]+?)\s*<\|ref_end\|>"
++)
++LAYOUT_IOU_THRESHOLD = 0.5
++
++
++@dataclass(frozen=True)
++class LayoutBlock:
++    label: str
++    bbox: tuple[float, float, float, float]
++
++
++@dataclass(frozen=True)
++class CaseComparison:
++    case_id: str
++    baseline_ok: bool
++    candidate_ok: bool
++    baseline_chars: int
++    candidate_chars: int
++    char_ratio: float | None
++    similarity: float | None
++    candidate_control_token_ratio: float
++    candidate_max_control_repeat: int
++    layout_baseline_boxes: int | None = None
++    layout_candidate_boxes: int | None = None
++    layout_matched_boxes: int | None = None
++    layout_precision: float | None = None
++    layout_recall: float | None = None
++    layout_f1: float | None = None
++
++
++@dataclass(frozen=True)
++class QualityThresholds:
++    min_similarity: float | None = None
++    similarity_cases: tuple[str, ...] = ()
++    max_control_token_ratio: float | None = None
++    max_control_repeat: int | None = None
++
++
++class QualityGateError(RuntimeError):
++    pass
++
++
++def read_results(path: Path) -> dict[str, dict[str, Any]]:
++    rows: dict[str, dict[str, Any]] = {}
++    with path.open(encoding="utf-8") as f:
++        for line in f:
++            if not line.strip():
++                continue
++            row = json.loads(line)
++            rows[str(row["case_id"])] = row
++    return rows
++
++
++def _normalize_text(text: str) -> str:
++    return " ".join(text.split())
++
++
++def _control_tokens(text: str) -> list[str]:
++    return CONTROL_TOKEN_RE.findall(text)
++
++
++def control_token_ratio(text: str) -> float:
++    if not text:
++        return 0.0
++    return sum(len(token) for token in _control_tokens(text)) / len(text)
++
++
++def max_consecutive_control_repeat(text: str) -> int:
++    max_repeat = 0
++    current_token: str | None = None
++    current_count = 0
++    for token in _control_tokens(text):
++        if token == current_token:
++            current_count += 1
++        else:
++            current_token = token
++            current_count = 1
++        max_repeat = max(max_repeat, current_count)
++    return max_repeat
++
++
++def parse_layout_blocks(text: str) -> list[LayoutBlock]:
++    blocks: list[LayoutBlock] = []
++    for match in LAYOUT_RE.finditer(text):
++        x1, y1, x2, y2 = (float(value) for value in match.group(1, 2, 3, 4))
++        if any(value < 0 or value > 1000 for value in (x1, y1, x2, y2)):
++            continue
++        left, right = sorted((x1, x2))
++        top, bottom = sorted((y1, y2))
++        if left == right or top == bottom:
++            continue
++        blocks.append(
++            LayoutBlock(
++                label=match.group(5).strip().lower(),
++                bbox=(left, top, right, bottom),
++            )
++        )
++    return blocks
++
++
++def _bbox_iou(
++    lhs: tuple[float, float, float, float],
++    rhs: tuple[float, float, float, float],
++) -> float:
++    left = max(lhs[0], rhs[0])
++    top = max(lhs[1], rhs[1])
++    right = min(lhs[2], rhs[2])
++    bottom = min(lhs[3], rhs[3])
++    if right <= left or bottom <= top:
++        return 0.0
++    intersection = (right - left) * (bottom - top)
++    lhs_area = (lhs[2] - lhs[0]) * (lhs[3] - lhs[1])
++    rhs_area = (rhs[2] - rhs[0]) * (rhs[3] - rhs[1])
++    union = lhs_area + rhs_area - intersection
++    return intersection / union if union else 0.0
++
++
++def compare_layout_blocks(
++    baseline_blocks: list[LayoutBlock],
++    candidate_blocks: list[LayoutBlock],
++    *,
++    iou_threshold: float = LAYOUT_IOU_THRESHOLD,
++) -> tuple[int, float, float, float]:
++    pairs: list[tuple[float, int, int]] = []
++    for baseline_index, baseline_block in enumerate(baseline_blocks):
++        for candidate_index, candidate_block in enumerate(candidate_blocks):
++            if baseline_block.label != candidate_block.label:
++                continue
++            iou = _bbox_iou(baseline_block.bbox, candidate_block.bbox)
++            if iou >= iou_threshold:
++                pairs.append((iou, baseline_index, candidate_index))
++
++    matched_baseline: set[int] = set()
++    matched_candidate: set[int] = set()
++    matches = 0
++    for _iou, baseline_index, candidate_index in sorted(pairs, reverse=True):
++        if baseline_index in matched_baseline or candidate_index in matched_candidate:
++            continue
++        matched_baseline.add(baseline_index)
++        matched_candidate.add(candidate_index)
++        matches += 1
++
++    precision = matches / len(candidate_blocks) if candidate_blocks else 0.0
++    recall = matches / len(baseline_blocks) if baseline_blocks else 0.0
++    f1 = (
++        2 * precision * recall / (precision + recall)
++        if precision + recall
++        else 0.0
++    )
++    return matches, precision, recall, f1
++
++
++def compare_case(
++    case_id: str,
++    baseline: dict[str, Any] | None,
++    candidate: dict[str, Any] | None,
++) -> CaseComparison:
++    baseline_text = baseline.get("output_text", "") if baseline else ""
++    candidate_text = candidate.get("output_text", "") if candidate else ""
++    baseline_chars = len(baseline_text)
++    candidate_chars = len(candidate_text)
++    char_ratio = (
++        candidate_chars / baseline_chars if baseline_chars and candidate_chars else None
++    )
++    similarity = None
++    if baseline_text and candidate_text:
++        similarity = SequenceMatcher(
++            None,
++            _normalize_text(baseline_text),
++            _normalize_text(candidate_text),
++            autojunk=False,
++        ).ratio()
++    layout_baseline_boxes = None
++    layout_candidate_boxes = None
++    layout_matched_boxes = None
++    layout_precision = None
++    layout_recall = None
++    layout_f1 = None
++    if case_id == "layout":
++        baseline_blocks = parse_layout_blocks(baseline_text)
++        candidate_blocks = parse_layout_blocks(candidate_text)
++        layout_baseline_boxes = len(baseline_blocks)
++        layout_candidate_boxes = len(candidate_blocks)
++        (
++            layout_matched_boxes,
++            layout_precision,
++            layout_recall,
++            layout_f1,
++        ) = compare_layout_blocks(baseline_blocks, candidate_blocks)
++    return CaseComparison(
++        case_id=case_id,
++        baseline_ok=bool(baseline and baseline.get("ok")),
++        candidate_ok=bool(candidate and candidate.get("ok")),
++        baseline_chars=baseline_chars,
++        candidate_chars=candidate_chars,
++        char_ratio=char_ratio,
++        similarity=similarity,
++        candidate_control_token_ratio=control_token_ratio(candidate_text),
++        candidate_max_control_repeat=max_consecutive_control_repeat(candidate_text),
++        layout_baseline_boxes=layout_baseline_boxes,
++        layout_candidate_boxes=layout_candidate_boxes,
++        layout_matched_boxes=layout_matched_boxes,
++        layout_precision=layout_precision,
++        layout_recall=layout_recall,
++        layout_f1=layout_f1,
++    )
++
++
++def compare_results(
++    baseline_results: dict[str, dict[str, Any]],
++    candidate_results: dict[str, dict[str, Any]],
++) -> list[CaseComparison]:
++    case_ids = sorted(set(baseline_results) | set(candidate_results))
++    return [
++        compare_case(
++            case_id,
++            baseline_results.get(case_id),
++            candidate_results.get(case_id),
++        )
++        for case_id in case_ids
++    ]
++
++
++def summarize_comparisons(comparisons: list[CaseComparison]) -> dict[str, Any]:
++    similarities = [
++        item.similarity for item in comparisons if item.similarity is not None
++    ]
++    ratios = [item.char_ratio for item in comparisons if item.char_ratio is not None]
++    layout_f1s = [item.layout_f1 for item in comparisons if item.layout_f1 is not None]
++    return {
++        "num_cases": len(comparisons),
++        "num_candidate_ok": sum(item.candidate_ok for item in comparisons),
++        "mean_similarity": (
++            sum(similarities) / len(similarities) if similarities else None
++        ),
++        "min_similarity": min(similarities) if similarities else None,
++        "mean_char_ratio": sum(ratios) / len(ratios) if ratios else None,
++        "max_control_token_ratio": max(
++            (item.candidate_control_token_ratio for item in comparisons),
++            default=0.0,
++        ),
++        "max_control_repeat": max(
++            (item.candidate_max_control_repeat for item in comparisons),
++            default=0,
++        ),
++        "mean_layout_f1": (
++            sum(layout_f1s) / len(layout_f1s) if layout_f1s else None
++        ),
++        "min_layout_f1": min(layout_f1s) if layout_f1s else None,
++    }
++
++
++def assert_quality_thresholds(
++    comparisons: list[CaseComparison],
++    thresholds: QualityThresholds,
++) -> None:
++    failures: list[str] = []
++    if thresholds.min_similarity is not None:
++        cases = set(thresholds.similarity_cases)
++        for item in comparisons:
++            if cases and item.case_id not in cases:
++                continue
++            if item.similarity is None or item.similarity < thresholds.min_similarity:
++                failures.append(
++                    f"{item.case_id}: similarity {item.similarity} "
++                    f"< min_similarity {thresholds.min_similarity}"
++                )
++    if thresholds.max_control_token_ratio is not None:
++        for item in comparisons:
++            if item.candidate_control_token_ratio > thresholds.max_control_token_ratio:
++                failures.append(
++                    f"{item.case_id}: control_token_ratio "
++                    f"{item.candidate_control_token_ratio} "
++                    f"> max_control_token_ratio "
++                    f"{thresholds.max_control_token_ratio}"
++                )
++    if thresholds.max_control_repeat is not None:
++        for item in comparisons:
++            if item.candidate_max_control_repeat > thresholds.max_control_repeat:
++                failures.append(
++                    f"{item.case_id}: max_control_repeat "
++                    f"{item.candidate_max_control_repeat} "
++                    f"> max_control_repeat {thresholds.max_control_repeat}"
++                )
++    if failures:
++        raise QualityGateError("; ".join(failures))
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--baseline", type=Path, required=True)
++    parser.add_argument("--candidate", type=Path, required=True)
++    parser.add_argument("--output", type=Path, default=None)
++    parser.add_argument("--min-similarity", type=float, default=None)
++    parser.add_argument(
++        "--similarity-cases",
++        default="",
++        help="comma-separated case ids to apply --min-similarity to",
++    )
++    parser.add_argument("--max-control-token-ratio", type=float, default=None)
++    parser.add_argument("--max-control-repeat", type=int, default=None)
++    return parser.parse_args()
++
++
++def main() -> None:
++    args = parse_args()
++    comparisons = compare_results(read_results(args.baseline), read_results(args.candidate))
++    payload = {
++        "summary": summarize_comparisons(comparisons),
++        "cases": [asdict(item) for item in comparisons],
++    }
++    text = json.dumps(payload, indent=2, ensure_ascii=False)
++    if args.output is not None:
++        args.output.parent.mkdir(parents=True, exist_ok=True)
++        args.output.write_text(text + "\n", encoding="utf-8")
++    print(text)
++    similarity_cases = tuple(
++        case_id.strip()
++        for case_id in args.similarity_cases.split(",")
++        if case_id.strip()
++    )
++    assert_quality_thresholds(
++        comparisons,
++        QualityThresholds(
++            min_similarity=args.min_similarity,
++            similarity_cases=similarity_cases,
++            max_control_token_ratio=args.max_control_token_ratio,
++            max_control_repeat=args.max_control_repeat,
++        ),
++    )
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/benchmarks/mineru_diffusion/end2end_openai.py b/benchmarks/mineru_diffusion/end2end_openai.py
+new file mode 100644
+index 00000000..64f2459f
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/end2end_openai.py
+@@ -0,0 +1,883 @@
++from __future__ import annotations
++
++import argparse
++import html
++import itertools
++import json
++import math
++import re
++import threading
++import time
++from concurrent.futures import ThreadPoolExecutor, as_completed
++from dataclasses import asdict, dataclass, field
++from pathlib import Path
++from typing import Any, Protocol
++
++import requests
++from PIL import Image
++
++from benchmarks.mineru_diffusion.harness import STOP_STRINGS
++
++
++SYSTEM_PROMPT = "You are a helpful assistant."
++LAYOUT_IMAGE_SIZE = (1036, 1036)
++MIN_IMAGE_EDGE = 28
++MAX_IMAGE_EDGE_RATIO = 50
++PARATEXT_TYPES = {
++    "header",
++    "footer",
++    "page_number",
++    "aside_text",
++    "page_footnote",
++    "unknown",
++}
++TASK_PROMPTS = {
++    "table": "\nTable Recognition:",
++    "equation": "\nFormula Recognition:",
++    "[default]": "\nText Recognition:",
++    "[layout]": "\nLayout Detection:",
++}
++ANGLE_MAPPING = {
++    "<|rotate_up|>": 0,
++    "<|rotate_right|>": 90,
++    "<|rotate_down|>": 180,
++    "<|rotate_left|>": 270,
++}
++LAYOUT_RE = re.compile(
++    r"^<\|box_start\|>(\d+)\s+(\d+)\s+(\d+)\s+(\d+)<\|box_end\|>"
++    r"<\|ref_start\|>(\w+?)<\|ref_end\|>(.*)$"
++)
++OTSL_NL = "<nl>"
++OTSL_FCEL = "<fcel>"
++OTSL_ECEL = "<ecel>"
++OTSL_LCEL = "<lcel>"
++OTSL_UCEL = "<ucel>"
++OTSL_XCEL = "<xcel>"
++OTSL_TOKENS = {
++    OTSL_NL,
++    OTSL_FCEL,
++    OTSL_ECEL,
++    OTSL_LCEL,
++    OTSL_UCEL,
++    OTSL_XCEL,
++}
++OTSL_PATTERN = re.compile(
++    "("
++    + "|".join(
++        re.escape(token)
++        for token in [OTSL_NL, OTSL_FCEL, OTSL_ECEL, OTSL_LCEL, OTSL_UCEL, OTSL_XCEL]
++    )
++    + ")"
++)
++
++
++@dataclass
++class ContentBlock:
++    type: str
++    bbox: list[float]
++    angle: int | None = None
++    content: str | None = None
++
++
++@dataclass
++class TableCell:
++    text: str
++    row_span: int
++    col_span: int
++    start_row: int
++    start_col: int
++
++
++@dataclass(frozen=True)
++class End2EndConfig:
++    image_path: Path
++    output_dir: Path
++    endpoint: str
++    model: str = "mineru-diffusion"
++    timeout: float = 600.0
++    layout_max_tokens: int = 2048
++    content_max_tokens: int = 1024
++    table_max_tokens: int = 2048
++    formula_max_tokens: int = 1024
++    block_size: int = 32
++    max_denoising_steps: int | None = None
++    temperature: float = 1.0
++    dynamic_threshold: float = 0.95
++    content_concurrency: int = 1
++    keep_paratext: bool = False
++
++
++@dataclass
++class End2EndResult:
++    markdown: str
++    layout_output: str
++    blocks: list[ContentBlock]
++    metrics: dict[str, Any]
++    result_path: Path
++    markdown_path: Path
++
++
++@dataclass
++class _BatchPageState:
++    config: End2EndConfig
++    page_image: Image.Image
++    artifacts_dir: Path
++    layout_output: str = ""
++    layout_elapsed: float = 0.0
++    blocks: list[ContentBlock] = field(default_factory=list)
++    extracted_blocks: int = 0
++
++
++class End2EndClient(Protocol):
++    def infer(self, image_path: Path, prompt: str, max_tokens: int) -> str:
++        ...
++
++
++class End2EndOpenAIClient:
++    def __init__(
++        self,
++        *,
++        endpoint: str,
++        model: str,
++        timeout: float,
++        block_size: int,
++        dynamic_threshold: float,
++        max_denoising_steps: int | None = None,
++        temperature: float = 1.0,
++    ) -> None:
++        self.endpoint = endpoint
++        self.model = model
++        self.timeout = timeout
++        self.block_size = block_size
++        self.dynamic_threshold = dynamic_threshold
++        self.max_denoising_steps = max_denoising_steps
++        self.temperature = temperature
++        self._thread_local = threading.local()
++
++    def _session(self) -> requests.Session:
++        session = getattr(self._thread_local, "session", None)
++        if session is None:
++            session = requests.Session()
++            session.trust_env = False
++            self._thread_local.session = session
++        return session
++
++    def infer(self, image_path: Path, prompt: str, max_tokens: int) -> str:
++        vllm_xargs = {
++            "block_size": self.block_size,
++            "dynamic_threshold": self.dynamic_threshold,
++        }
++        payload = {
++            "model": self.model,
++            "messages": [
++                {
++                    "role": "system",
++                    "content": [{"type": "text", "text": SYSTEM_PROMPT}],
++                },
++                {
++                    "role": "user",
++                    "content": [
++                        {
++                            "type": "image_url",
++                            "image_url": {"url": f"file://{image_path}"},
++                        },
++                        {"type": "text", "text": prompt},
++                    ],
++                },
++            ],
++            "max_tokens": max_tokens,
++            "temperature": self.temperature,
++            "stop": list(STOP_STRINGS),
++            "block_size": self.block_size,
++            "dynamic_threshold": self.dynamic_threshold,
++            "vllm_xargs": vllm_xargs,
++        }
++        if self.max_denoising_steps is not None:
++            payload["max_denoising_steps"] = self.max_denoising_steps
++            vllm_xargs["max_denoising_steps"] = self.max_denoising_steps
++        response = self._session().post(
++            self.endpoint,
++            json=payload,
++            timeout=self.timeout,
++        )
++        response.raise_for_status()
++        return trim_response(response.json()["choices"][0]["message"]["content"])
++
++
++def trim_response(text: str) -> str:
++    for stop in STOP_STRINGS:
++        text = text.split(stop, 1)[0]
++    return text.strip()
++
++
++def get_rgb_image(image: Image.Image) -> Image.Image:
++    if image.mode != "RGB":
++        return image.convert("RGB")
++    return image
++
++
++def resize_by_need(image: Image.Image) -> Image.Image:
++    edge_ratio = max(image.size) / min(image.size)
++    if edge_ratio > MAX_IMAGE_EDGE_RATIO:
++        width, height = image.size
++        if width > height:
++            new_w, new_h = width, math.ceil(width / MAX_IMAGE_EDGE_RATIO)
++        else:
++            new_w, new_h = math.ceil(height / MAX_IMAGE_EDGE_RATIO), height
++        new_image = Image.new(image.mode, (new_w, new_h), (255, 255, 255))
++        new_image.paste(image, (int((new_w - width) / 2), int((new_h - height) / 2)))
++        image = new_image
++    if min(image.size) < MIN_IMAGE_EDGE:
++        scale = MIN_IMAGE_EDGE / min(image.size)
++        new_w, new_h = round(image.width * scale), round(image.height * scale)
++        image = image.resize((new_w, new_h), Image.Resampling.BICUBIC)
++    return image
++
++
++def prepare_layout_image(image: Image.Image) -> Image.Image:
++    return get_rgb_image(image).resize(LAYOUT_IMAGE_SIZE, Image.Resampling.BICUBIC)
++
++
++def convert_bbox(raw_bbox: tuple[str, str, str, str]) -> list[float] | None:
++    x1, y1, x2, y2 = map(int, raw_bbox)
++    if any(coord < 0 or coord > 1000 for coord in (x1, y1, x2, y2)):
++        return None
++    x1, x2 = (x2, x1) if x2 < x1 else (x1, x2)
++    y1, y2 = (y2, y1) if y2 < y1 else (y1, y2)
++    if x1 == x2 or y1 == y2:
++        return None
++    return [value / 1000.0 for value in (x1, y1, x2, y2)]
++
++
++def parse_angle(tail: str) -> int | None:
++    for token, angle in ANGLE_MAPPING.items():
++        if token in tail:
++            return angle
++    return None
++
++
++def parse_layout_output(output: str) -> list[ContentBlock]:
++    blocks: list[ContentBlock] = []
++    for line in output.splitlines():
++        match = LAYOUT_RE.match(line.strip())
++        if not match:
++            continue
++        x1, y1, x2, y2, block_type, tail = match.groups()
++        bbox = convert_bbox((x1, y1, x2, y2))
++        if bbox is None:
++            continue
++        blocks.append(
++            ContentBlock(
++                type=block_type.lower(),
++                bbox=bbox,
++                angle=parse_angle(tail),
++            )
++        )
++    return blocks
++
++
++def crop_block_image(page_image: Image.Image, block: ContentBlock) -> Image.Image:
++    image = get_rgb_image(page_image)
++    width, height = image.size
++    left = max(0, min(width - 1, math.floor(block.bbox[0] * width)))
++    top = max(0, min(height - 1, math.floor(block.bbox[1] * height)))
++    right = max(left + 1, min(width, math.ceil(block.bbox[2] * width)))
++    bottom = max(top + 1, min(height, math.ceil(block.bbox[3] * height)))
++    cropped = image.crop((left, top, right, bottom))
++    if block.angle in (90, 180, 270):
++        cropped = cropped.rotate(block.angle, expand=True)
++    return resize_by_need(cropped)
++
++
++def extract_otsl_tokens_and_text(raw_text: str) -> tuple[list[str], list[str]]:
++    tokens = OTSL_PATTERN.findall(raw_text)
++    text_parts = [
++        part for part in OTSL_PATTERN.split(raw_text) if part and part.strip()
++    ]
++    return tokens, text_parts
++
++
++def count_span_right(
++    rows: list[list[str]],
++    row_idx: int,
++    col_idx: int,
++    span_tokens: set[str],
++) -> int:
++    span = 0
++    cursor = col_idx
++    while cursor < len(rows[row_idx]) and rows[row_idx][cursor] in span_tokens:
++        span += 1
++        cursor += 1
++    return span
++
++
++def count_span_down(
++    rows: list[list[str]],
++    row_idx: int,
++    col_idx: int,
++    span_tokens: set[str],
++) -> int:
++    span = 0
++    cursor = row_idx
++    while (
++        cursor < len(rows)
++        and col_idx < len(rows[cursor])
++        and rows[cursor][col_idx] in span_tokens
++    ):
++        span += 1
++        cursor += 1
++    return span
++
++
++def convert_otsl_to_html(otsl_content: str) -> str:
++    if otsl_content.startswith("<table") and otsl_content.endswith("</table>"):
++        return otsl_content
++
++    tokens, mixed_texts = extract_otsl_tokens_and_text(otsl_content)
++    rows = [
++        list(group)
++        for is_nl, group in itertools.groupby(tokens, lambda item: item == OTSL_NL)
++        if not is_nl
++    ]
++    if not rows:
++        return otsl_content.strip()
++
++    max_cols = max(len(row) for row in rows)
++    for row in rows:
++        while len(row) < max_cols:
++            row.append(OTSL_ECEL)
++
++    normalized_texts: list[str] = []
++    text_idx = 0
++    for row in rows:
++        for token in row:
++            normalized_texts.append(token)
++            if text_idx < len(mixed_texts) and mixed_texts[text_idx] == token:
++                text_idx += 1
++                if (
++                    text_idx < len(mixed_texts)
++                    and mixed_texts[text_idx] not in OTSL_TOKENS
++                ):
++                    normalized_texts.append(mixed_texts[text_idx])
++                    text_idx += 1
++        normalized_texts.append(OTSL_NL)
++        if text_idx < len(mixed_texts) and mixed_texts[text_idx] == OTSL_NL:
++            text_idx += 1
++
++    cells: list[TableCell] = []
++    row_idx = 0
++    col_idx = 0
++    for index, part in enumerate(normalized_texts):
++        if part in (OTSL_FCEL, OTSL_ECEL):
++            row_span = 1
++            col_span = 1
++            next_offset = 1
++            cell_text = ""
++            if (
++                index + 1 < len(normalized_texts)
++                and normalized_texts[index + 1] not in OTSL_TOKENS
++            ):
++                cell_text = normalized_texts[index + 1].strip()
++                next_offset = 2
++            next_right = (
++                normalized_texts[index + next_offset]
++                if index + next_offset < len(normalized_texts)
++                else ""
++            )
++            next_down = (
++                rows[row_idx + 1][col_idx]
++                if row_idx + 1 < len(rows) and col_idx < len(rows[row_idx + 1])
++                else ""
++            )
++            if next_right in (OTSL_LCEL, OTSL_XCEL):
++                col_span += count_span_right(
++                    rows,
++                    row_idx,
++                    col_idx + 1,
++                    {OTSL_LCEL, OTSL_XCEL},
++                )
++            if next_down in (OTSL_UCEL, OTSL_XCEL):
++                row_span += count_span_down(
++                    rows,
++                    row_idx + 1,
++                    col_idx,
++                    {OTSL_UCEL, OTSL_XCEL},
++                )
++            cells.append(
++                TableCell(
++                    text=cell_text,
++                    row_span=row_span,
++                    col_span=col_span,
++                    start_row=row_idx,
++                    start_col=col_idx,
++                )
++            )
++        if part in OTSL_TOKENS - {OTSL_NL}:
++            col_idx += 1
++        if part == OTSL_NL:
++            row_idx += 1
++            col_idx = 0
++
++    html_parts = ["<table>"]
++    for row in range(len(rows)):
++        html_parts.append("<tr>")
++        for col in range(max_cols):
++            cell = next(
++                (
++                    item
++                    for item in cells
++                    if item.start_row == row and item.start_col == col
++                ),
++                None,
++            )
++            if cell is None:
++                continue
++            attrs = []
++            if cell.row_span > 1:
++                attrs.append(f' rowspan="{cell.row_span}"')
++            if cell.col_span > 1:
++                attrs.append(f' colspan="{cell.col_span}"')
++            html_parts.append(f"<td{''.join(attrs)}>{html.escape(cell.text)}</td>")
++        html_parts.append("</tr>")
++    html_parts.append("</table>")
++    return "".join(html_parts)
++
++
++def wrap_equation(content: str) -> str:
++    content = content.strip()
++    if not content:
++        return ""
++    if not content.startswith("\\["):
++        content = f"\\[\n{content}"
++    if not content.endswith("\\]"):
++        content = f"{content}\n\\]"
++    return content
++
++
++def render_block_content(block: ContentBlock) -> str:
++    content = (block.content or "").strip()
++    if not content:
++        return ""
++    if block.type == "table":
++        return convert_otsl_to_html(content)
++    if block.type == "equation":
++        return wrap_equation(content)
++    return content
++
++
++def should_extract_block(block: ContentBlock) -> bool:
++    return block.type not in {"image", "equation_block"}
++
++
++def should_keep_block(block: ContentBlock, keep_paratext: bool) -> bool:
++    if not block.content:
++        return False
++    if not keep_paratext and block.type in PARATEXT_TYPES:
++        return False
++    return True
++
++
++def _write_image(path: Path, image: Image.Image) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    image.save(path)
++
++
++def infer_block_content(
++    *,
++    client: End2EndClient,
++    page_image: Image.Image,
++    artifacts_dir: Path,
++    block: ContentBlock,
++    index: int,
++    config: End2EndConfig,
++) -> str:
++    prompt = TASK_PROMPTS.get(block.type, TASK_PROMPTS["[default]"])
++    max_tokens = config.content_max_tokens
++    if block.type == "table":
++        max_tokens = config.table_max_tokens
++    elif block.type == "equation":
++        max_tokens = config.formula_max_tokens
++    block_image = crop_block_image(page_image, block)
++    block_image_path = artifacts_dir / f"block_{index:04d}_{block.type}.png"
++    _write_image(block_image_path, block_image)
++    return render_block_content(
++        ContentBlock(
++            type=block.type,
++            bbox=list(block.bbox),
++            angle=block.angle,
++            content=client.infer(block_image_path, prompt, max_tokens),
++        )
++    )
++
++
++def extract_blocks(
++    *,
++    client: End2EndClient,
++    page_image: Image.Image,
++    artifacts_dir: Path,
++    blocks: list[ContentBlock],
++    config: End2EndConfig,
++) -> int:
++    targets = [
++        (index, block)
++        for index, block in enumerate(blocks)
++        if should_extract_block(block)
++    ]
++    if config.content_concurrency <= 1 or len(targets) <= 1:
++        for index, block in targets:
++            block.content = infer_block_content(
++                client=client,
++                page_image=page_image,
++                artifacts_dir=artifacts_dir,
++                block=block,
++                index=index,
++                config=config,
++            )
++        return len(targets)
++
++    with ThreadPoolExecutor(max_workers=config.content_concurrency) as executor:
++        futures = {
++            executor.submit(
++                infer_block_content,
++                client=client,
++                page_image=page_image,
++                artifacts_dir=artifacts_dir,
++                block=block,
++                index=index,
++                config=config,
++            ): (index, block)
++            for index, block in targets
++        }
++        for future in as_completed(futures):
++            _index, block = futures[future]
++            block.content = future.result()
++    return len(targets)
++
++
++def render_markdown(blocks: list[ContentBlock], keep_paratext: bool) -> str:
++    rendered_parts = [
++        block.content or ""
++        for block in blocks
++        if should_keep_block(block, keep_paratext)
++    ]
++    return "\n\n".join(part for part in rendered_parts if part)
++
++
++def write_end2end_result(
++    *,
++    output_dir: Path,
++    markdown: str,
++    layout_output: str,
++    blocks: list[ContentBlock],
++    metrics: dict[str, Any],
++) -> tuple[Path, Path]:
++    timestamp = int(time.time())
++    markdown_path = output_dir / f"markdown_{timestamp}.md"
++    result_path = output_dir / f"result_{timestamp}.json"
++    markdown_path.write_text(markdown, encoding="utf-8")
++    payload = {
++        "metrics": metrics,
++        "layout_output": layout_output,
++        "markdown": markdown,
++        "blocks": [asdict(block) for block in blocks],
++        "markdown_path": str(markdown_path),
++    }
++    result_text = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
++    result_path.write_text(result_text, encoding="utf-8")
++    (output_dir / "latest_result.json").write_text(result_text, encoding="utf-8")
++    return result_path, markdown_path
++
++
++def _infer_layout_for_state(
++    *,
++    client: End2EndClient,
++    state: _BatchPageState,
++) -> None:
++    layout_image_path = state.artifacts_dir / "layout_input.png"
++    _write_image(layout_image_path, prepare_layout_image(state.page_image))
++    layout_start = time.perf_counter()
++    state.layout_output = client.infer(
++        layout_image_path,
++        TASK_PROMPTS["[layout]"],
++        state.config.layout_max_tokens,
++    )
++    state.layout_elapsed = time.perf_counter() - layout_start
++    state.blocks = parse_layout_output(state.layout_output)
++
++
++def _extract_batch_blocks(
++    *,
++    client: End2EndClient,
++    states: list[_BatchPageState],
++    content_concurrency: int,
++) -> int:
++    targets = [
++        (state, index, block)
++        for state in states
++        for index, block in enumerate(state.blocks)
++        if should_extract_block(block)
++    ]
++    if content_concurrency <= 1 or len(targets) <= 1:
++        for state, index, block in targets:
++            block.content = infer_block_content(
++                client=client,
++                page_image=state.page_image,
++                artifacts_dir=state.artifacts_dir,
++                block=block,
++                index=index,
++                config=state.config,
++            )
++            state.extracted_blocks += 1
++        return len(targets)
++
++    with ThreadPoolExecutor(max_workers=content_concurrency) as executor:
++        futures = {
++            executor.submit(
++                infer_block_content,
++                client=client,
++                page_image=state.page_image,
++                artifacts_dir=state.artifacts_dir,
++                block=block,
++                index=index,
++                config=state.config,
++            ): (state, block)
++            for state, index, block in targets
++        }
++        for future in as_completed(futures):
++            state, block = futures[future]
++            block.content = future.result()
++            state.extracted_blocks += 1
++    return len(targets)
++
++
++def run_end2end_batch(
++    configs: list[End2EndConfig],
++    *,
++    client: End2EndClient | None = None,
++    layout_concurrency: int = 1,
++    content_concurrency: int | None = None,
++) -> list[End2EndResult]:
++    if not configs:
++        return []
++
++    first = configs[0]
++    client = client or End2EndOpenAIClient(
++        endpoint=first.endpoint,
++        model=first.model,
++        timeout=first.timeout,
++        block_size=first.block_size,
++        dynamic_threshold=first.dynamic_threshold,
++        max_denoising_steps=first.max_denoising_steps,
++        temperature=first.temperature,
++    )
++    content_concurrency = content_concurrency or max(
++        config.content_concurrency for config in configs
++    )
++    states: list[_BatchPageState] = []
++    for config in configs:
++        output_dir = config.output_dir
++        artifacts_dir = output_dir / "artifacts"
++        output_dir.mkdir(parents=True, exist_ok=True)
++        artifacts_dir.mkdir(parents=True, exist_ok=True)
++        page_image = Image.open(config.image_path.expanduser().resolve()).convert("RGB")
++        states.append(
++            _BatchPageState(
++                config=config,
++                page_image=page_image,
++                artifacts_dir=artifacts_dir,
++            )
++        )
++
++    started = time.perf_counter()
++    layout_start = time.perf_counter()
++    try:
++        if layout_concurrency <= 1 or len(states) <= 1:
++            for state in states:
++                _infer_layout_for_state(client=client, state=state)
++        else:
++            with ThreadPoolExecutor(max_workers=layout_concurrency) as executor:
++                futures = [
++                    executor.submit(
++                        _infer_layout_for_state,
++                        client=client,
++                        state=state,
++                    )
++                    for state in states
++                ]
++                for future in as_completed(futures):
++                    future.result()
++        layout_wall_elapsed = time.perf_counter() - layout_start
++
++        extract_start = time.perf_counter()
++        _extract_batch_blocks(
++            client=client,
++            states=states,
++            content_concurrency=content_concurrency,
++        )
++        extract_wall_elapsed = time.perf_counter() - extract_start
++        wall_elapsed = time.perf_counter() - started
++
++        results: list[End2EndResult] = []
++        for state in states:
++            markdown = render_markdown(
++                state.blocks,
++                state.config.keep_paratext,
++            )
++            metrics: dict[str, Any] = {
++                "layout_elapsed": state.layout_elapsed,
++                "num_blocks": len(state.blocks),
++                "num_extracted_blocks": state.extracted_blocks,
++                "markdown_chars": len(markdown),
++                "content_concurrency": content_concurrency,
++                "layout_concurrency": layout_concurrency,
++                "throughput_batch_size": len(states),
++                "throughput_wall_elapsed_s": wall_elapsed,
++                "throughput_layout_wall_elapsed_s": layout_wall_elapsed,
++                "throughput_extract_wall_elapsed_s": extract_wall_elapsed,
++            }
++            result_path, markdown_path = write_end2end_result(
++                output_dir=state.config.output_dir,
++                markdown=markdown,
++                layout_output=state.layout_output,
++                blocks=state.blocks,
++                metrics=metrics,
++            )
++            results.append(
++                End2EndResult(
++                    markdown=markdown,
++                    layout_output=state.layout_output,
++                    blocks=state.blocks,
++                    metrics=metrics,
++                    result_path=result_path,
++                    markdown_path=markdown_path,
++                )
++            )
++        return results
++    finally:
++        for state in states:
++            state.page_image.close()
++
++
++def run_end2end(
++    config: End2EndConfig,
++    *,
++    client: End2EndClient | None = None,
++) -> End2EndResult:
++    output_dir = config.output_dir
++    artifacts_dir = output_dir / "artifacts"
++    output_dir.mkdir(parents=True, exist_ok=True)
++    artifacts_dir.mkdir(parents=True, exist_ok=True)
++    image_path = config.image_path.expanduser().resolve()
++    page_image = Image.open(image_path).convert("RGB")
++    client = client or End2EndOpenAIClient(
++        endpoint=config.endpoint,
++        model=config.model,
++        timeout=config.timeout,
++        block_size=config.block_size,
++        dynamic_threshold=config.dynamic_threshold,
++        max_denoising_steps=config.max_denoising_steps,
++        temperature=config.temperature,
++    )
++
++    started = time.perf_counter()
++    layout_image_path = artifacts_dir / "layout_input.png"
++    _write_image(layout_image_path, prepare_layout_image(page_image))
++    layout_start = time.perf_counter()
++    layout_output = client.infer(
++        layout_image_path,
++        TASK_PROMPTS["[layout]"],
++        config.layout_max_tokens,
++    )
++    layout_elapsed = time.perf_counter() - layout_start
++    blocks = parse_layout_output(layout_output)
++
++    extract_start = time.perf_counter()
++    extracted_blocks = extract_blocks(
++        client=client,
++        page_image=page_image,
++        artifacts_dir=artifacts_dir,
++        blocks=blocks,
++        config=config,
++    )
++    extract_elapsed = time.perf_counter() - extract_start
++
++    markdown = render_markdown(blocks, config.keep_paratext)
++    metrics: dict[str, Any] = {
++        "layout_elapsed": layout_elapsed,
++        "extract_elapsed": extract_elapsed,
++        "total_elapsed": time.perf_counter() - started,
++        "num_blocks": len(blocks),
++        "num_extracted_blocks": extracted_blocks,
++        "markdown_chars": len(markdown),
++        "content_concurrency": config.content_concurrency,
++    }
++
++    result_path, markdown_path = write_end2end_result(
++        output_dir=output_dir,
++        markdown=markdown,
++        layout_output=layout_output,
++        blocks=blocks,
++        metrics=metrics,
++    )
++    return End2EndResult(
++        markdown=markdown,
++        layout_output=layout_output,
++        blocks=blocks,
++        metrics=metrics,
++        result_path=result_path,
++        markdown_path=markdown_path,
++    )
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--endpoint", default="http://127.0.0.1:18084/v1/chat/completions")
++    parser.add_argument("--model", default="mineru-diffusion")
++    parser.add_argument("--image-path", required=True, type=Path)
++    parser.add_argument(
++        "--output-dir",
++        type=Path,
++        default=Path("benchmark_results/mineru_diffusion/end2end_openai"),
++    )
++    parser.add_argument("--timeout", type=float, default=600.0)
++    parser.add_argument("--layout-max-tokens", type=int, default=2048)
++    parser.add_argument("--content-max-tokens", type=int, default=1024)
++    parser.add_argument("--table-max-tokens", type=int, default=2048)
++    parser.add_argument("--formula-max-tokens", type=int, default=1024)
++    parser.add_argument("--block-size", type=int, default=32)
++    parser.add_argument("--max-denoising-steps", type=int)
++    parser.add_argument("--temperature", type=float, default=1.0)
++    parser.add_argument("--dynamic-threshold", type=float, default=0.95)
++    parser.add_argument("--content-concurrency", type=int, default=1)
++    parser.add_argument("--keep-paratext", action="store_true")
++    return parser.parse_args()
++
++
++def main() -> None:
++    args = parse_args()
++    result = run_end2end(
++        End2EndConfig(
++            image_path=args.image_path,
++            output_dir=args.output_dir,
++            endpoint=args.endpoint,
++            model=args.model,
++            timeout=args.timeout,
++            layout_max_tokens=args.layout_max_tokens,
++            content_max_tokens=args.content_max_tokens,
++            table_max_tokens=args.table_max_tokens,
++            formula_max_tokens=args.formula_max_tokens,
++            block_size=args.block_size,
++            max_denoising_steps=args.max_denoising_steps,
++            temperature=args.temperature,
++            dynamic_threshold=args.dynamic_threshold,
++            content_concurrency=args.content_concurrency,
++            keep_paratext=args.keep_paratext,
++        )
++    )
++    print(json.dumps(result.metrics, indent=2, ensure_ascii=False))
++    print(f"result: {result.result_path}")
++    print(f"markdown: {result.markdown_path}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/benchmarks/mineru_diffusion/end2end_suite.py b/benchmarks/mineru_diffusion/end2end_suite.py
+new file mode 100644
+index 00000000..9efcd0b6
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/end2end_suite.py
+@@ -0,0 +1,1018 @@
++from __future__ import annotations
++
++import argparse
++import json
++import statistics
++import time
++from collections import Counter
++from dataclasses import asdict, dataclass
++from difflib import SequenceMatcher
++from pathlib import Path
++from typing import Any, Iterable, Sequence
++
++import pypdfium2 as pdfium
++from PIL import Image
++
++from benchmarks.mineru_diffusion.compare_results import (
++    compare_layout_blocks,
++    parse_layout_blocks,
++)
++from benchmarks.mineru_diffusion.end2end_openai import (
++    End2EndConfig,
++    End2EndClient,
++    End2EndOpenAIClient,
++    convert_otsl_to_html,
++    run_end2end_batch,
++    run_end2end,
++    wrap_equation,
++)
++
++
++PARATEXT_TYPES = {
++    "header",
++    "footer",
++    "page_number",
++    "aside_text",
++    "page_footnote",
++    "unknown",
++}
++ROTATE_TOKENS = {
++    None: "<|rotate_up|>",
++    0: "<|rotate_up|>",
++    90: "<|rotate_right|>",
++    180: "<|rotate_down|>",
++    270: "<|rotate_left|>",
++}
++
++
++@dataclass(frozen=True)
++class PdfSource:
++    doc_id: str
++    pdf_path: Path
++    pages: str = "all"
++
++
++@dataclass(frozen=True)
++class PageCase:
++    case_id: str
++    doc_id: str
++    pdf_path: Path
++    page_index: int
++    image_path: Path
++    width: int
++    height: int
++
++
++def parse_page_spec(spec: str, page_count: int) -> list[int]:
++    spec = spec.strip().lower()
++    if page_count < 1:
++        return []
++    if spec in {"", "all", "*"}:
++        return list(range(page_count))
++
++    pages: list[int] = []
++    for token in (part.strip() for part in spec.split(",")):
++        if not token:
++            continue
++        if token == "last":
++            pages.append(page_count - 1)
++            continue
++        if token.startswith("first:"):
++            count = int(token.split(":", 1)[1])
++            pages.extend(range(min(count, page_count)))
++            continue
++        if token.startswith("last:"):
++            count = int(token.split(":", 1)[1])
++            start = max(0, page_count - count)
++            pages.extend(range(start, page_count))
++            continue
++        if "-" in token:
++            start_text, end_text = token.split("-", 1)
++            start = int(start_text)
++            end = page_count - 1 if end_text == "last" else int(end_text)
++            if end < start:
++                raise ValueError(f"Invalid descending page range: {token}")
++            pages.extend(range(start, end + 1))
++            continue
++        pages.append(int(token))
++
++    seen: set[int] = set()
++    normalized: list[int] = []
++    for page in pages:
++        if page < 0 or page >= page_count:
++            raise ValueError(
++                f"Page index {page} out of range for document with {page_count} pages"
++            )
++        if page not in seen:
++            seen.add(page)
++            normalized.append(page)
++    return normalized
++
++
++def default_pdf_sources(repo_root: Path | None = None) -> list[PdfSource]:
++    repo_root = (repo_root or Path.cwd()).resolve()
++    candidates = [
++        PdfSource("mineru_demo1", repo_root / "../MinerU/demo/pdfs/demo1.pdf", "0-2"),
++        PdfSource("mineru_demo2", repo_root / "../MinerU/demo/pdfs/demo2.pdf", "0-2"),
++        PdfSource("mineru_demo3", repo_root / "../MinerU/demo/pdfs/demo3.pdf", "0-2"),
++        PdfSource("mineru_small_ocr", repo_root / "../MinerU/demo/pdfs/small_ocr.pdf", "0-2"),
++        PdfSource("mineru_unit_test", repo_root / "../MinerU/tests/unittest/pdfs/test.pdf", "all"),
++        PdfSource(
++            "mineru_diffusion_paper",
++            repo_root / "../MinerU-Diffusion/docs/MinerU-Diffusion-V1.pdf",
++            "0-2,5,10,20,last",
++        ),
++        PdfSource(
++            "ragflow_doc1",
++            repo_root / "../ragflow-0.25.6/test/benchmark/test_docs/Doc1.pdf",
++            "all",
++        ),
++        PdfSource(
++            "ragflow_doc2",
++            repo_root / "../ragflow-0.25.6/test/benchmark/test_docs/Doc2.pdf",
++            "all",
++        ),
++        PdfSource(
++            "ragflow_doc3",
++            repo_root / "../ragflow-0.25.6/test/benchmark/test_docs/Doc3.pdf",
++            "all",
++        ),
++    ]
++    return [
++        PdfSource(item.doc_id, item.pdf_path.resolve(), item.pages)
++        for item in candidates
++        if item.pdf_path.exists()
++    ]
++
++
++def _render_page(pdf_doc: pdfium.PdfDocument, page_index: int, scale: float) -> Image.Image:
++    page = pdf_doc[page_index]
++    try:
++        return page.render(scale=scale).to_pil().convert("RGB")
++    finally:
++        page.close()
++
++
++def render_pdf_sources(
++    sources: Sequence[PdfSource],
++    output_dir: Path,
++    *,
++    scale: float = 2.0,
++) -> list[PageCase]:
++    images_dir = output_dir / "images"
++    images_dir.mkdir(parents=True, exist_ok=True)
++    cases: list[PageCase] = []
++
++    for source in sources:
++        pdf_path = source.pdf_path.expanduser().resolve()
++        pdf_doc = pdfium.PdfDocument(str(pdf_path))
++        try:
++            page_count = len(pdf_doc)
++            page_indices = parse_page_spec(source.pages, page_count)
++            for page_index in page_indices:
++                image = _render_page(pdf_doc, page_index, scale)
++                case_id = f"{source.doc_id}_p{page_index + 1:04d}"
++                image_path = images_dir / f"{case_id}.png"
++                image.save(image_path)
++                cases.append(
++                    PageCase(
++                        case_id=case_id,
++                        doc_id=source.doc_id,
++                        pdf_path=pdf_path,
++                        page_index=page_index,
++                        image_path=image_path.resolve(),
++                        width=image.width,
++                        height=image.height,
++                    )
++                )
++                image.close()
++        finally:
++            pdf_doc.close()
++
++    write_manifest(output_dir / "manifest.json", cases)
++    return cases
++
++
++def write_manifest(path: Path, cases: Sequence[PageCase]) -> None:
++    payload = {"cases": [_case_to_json(case) for case in cases]}
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
++
++
++def load_manifest(path: Path) -> list[PageCase]:
++    payload = json.loads(path.read_text(encoding="utf-8"))
++    cases = []
++    for row in payload["cases"]:
++        cases.append(
++            PageCase(
++                case_id=row["case_id"],
++                doc_id=row["doc_id"],
++                pdf_path=Path(row["pdf_path"]),
++                page_index=int(row["page_index"]),
++                image_path=Path(row["image_path"]),
++                width=int(row["width"]),
++                height=int(row["height"]),
++            )
++        )
++    return cases
++
++
++def _case_to_json(case: PageCase) -> dict[str, Any]:
++    payload = asdict(case)
++    payload["pdf_path"] = str(case.pdf_path)
++    payload["image_path"] = str(case.image_path)
++    return payload
++
++
++def _block_get(block: Any, key: str, default: Any = None) -> Any:
++    if isinstance(block, dict):
++        return block.get(key, default)
++    return getattr(block, key, default)
++
++
++def block_type_counts(blocks: Sequence[Any]) -> dict[str, int]:
++    return dict(Counter(str(_block_get(block, "type", "")) for block in blocks))
++
++
++def _block_content(block: Any) -> str:
++    content = str(_block_get(block, "content", "") or "").strip()
++    if not content:
++        return ""
++    block_type = str(_block_get(block, "type", ""))
++    if block_type == "table":
++        return convert_otsl_to_html(content)
++    if block_type == "equation":
++        return wrap_equation(content)
++    return content
++
++
++def blocks_to_markdown(blocks: Sequence[Any], *, keep_paratext: bool = False) -> str:
++    parts: list[str] = []
++    for block in blocks:
++        block_type = str(_block_get(block, "type", ""))
++        if not keep_paratext and block_type in PARATEXT_TYPES:
++            continue
++        content = _block_content(block)
++        if content:
++            parts.append(content)
++    return "\n\n".join(parts)
++
++
++def _bbox_to_1000(bbox: Sequence[float]) -> tuple[int, int, int, int] | None:
++    if len(bbox) != 4:
++        return None
++    left, top, right, bottom = (float(value) for value in bbox)
++    if right <= left or bottom <= top:
++        return None
++    return tuple(
++        max(0, min(1000, round(value * 1000)))
++        for value in (left, top, right, bottom)
++    )
++
++
++def blocks_to_layout_text(blocks: Sequence[Any]) -> str:
++    lines: list[str] = []
++    for block in blocks:
++        bbox = _bbox_to_1000(_block_get(block, "bbox", []))
++        if bbox is None:
++            continue
++        block_type = str(_block_get(block, "type", "unknown"))
++        angle = _block_get(block, "angle", None)
++        rotate = ROTATE_TOKENS.get(angle, "<|rotate_up|>")
++        lines.append(
++            "<|box_start|>"
++            f"{bbox[0]:03d} {bbox[1]:03d} {bbox[2]:03d} {bbox[3]:03d}"
++            "<|box_end|>"
++            f"<|ref_start|>{block_type}<|ref_end|>{rotate}"
++        )
++    return "\n".join(lines)
++
++
++def _jsonable_blocks(blocks: Sequence[Any]) -> list[dict[str, Any]]:
++    rows = []
++    for block in blocks:
++        if isinstance(block, dict):
++            rows.append(dict(block))
++        else:
++            rows.append(asdict(block))
++    return rows
++
++
++def make_result_row(
++    case: PageCase,
++    *,
++    ok: bool,
++    metrics: dict[str, Any] | None = None,
++    blocks: Sequence[Any] = (),
++    markdown: str = "",
++    layout_output: str = "",
++    error: str | None = None,
++) -> dict[str, Any]:
++    blocks_json = _jsonable_blocks(blocks)
++    layout_text = layout_output or blocks_to_layout_text(blocks_json)
++    return {
++        **_case_to_json(case),
++        "ok": ok,
++        "error": error,
++        "metrics": metrics or {},
++        "markdown": markdown,
++        "layout_output": layout_text,
++        "blocks": blocks_json,
++        "block_type_counts": block_type_counts(blocks_json),
++    }
++
++
++def _write_jsonl(path: Path, rows: Iterable[dict[str, Any]]) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    with path.open("w", encoding="utf-8") as f:
++        for row in rows:
++            f.write(json.dumps(row, ensure_ascii=False) + "\n")
++
++
++def _read_jsonl(path: Path) -> list[dict[str, Any]]:
++    rows = []
++    with path.open(encoding="utf-8") as f:
++        for line in f:
++            if line.strip():
++                rows.append(json.loads(line))
++    return rows
++
++
++def _latency(row: dict[str, Any]) -> float | None:
++    value = row.get("metrics", {}).get("total_elapsed")
++    return float(value) if value is not None else None
++
++
++def summarize_suite_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
++    ok_rows = [row for row in rows if row.get("ok")]
++    latencies = [
++        latency
++        for latency in (_latency(row) for row in ok_rows)
++        if latency is not None
++    ]
++    type_counts: Counter[str] = Counter()
++    for row in ok_rows:
++        type_counts.update(row.get("block_type_counts", {}))
++    markdown_chars = sum(len(row.get("markdown", "")) for row in ok_rows)
++    total_latency = sum(latencies)
++    summary = {
++        "num_cases": len(rows),
++        "num_ok": len(ok_rows),
++        "num_failed": len(rows) - len(ok_rows),
++        "mean_latency_s": statistics.mean(latencies) if latencies else None,
++        "p50_latency_s": statistics.median(latencies) if latencies else None,
++        "max_latency_s": max(latencies) if latencies else None,
++        "total_latency_s": total_latency if latencies else None,
++        "markdown_chars": markdown_chars,
++        "markdown_chars_per_s": (
++            markdown_chars / total_latency if total_latency > 0 else None
++        ),
++        "block_type_counts": dict(type_counts),
++    }
++    content_concurrency_values = {
++        row.get("metrics", {}).get("content_concurrency")
++        for row in ok_rows
++        if row.get("metrics", {}).get("content_concurrency") is not None
++    }
++    if len(content_concurrency_values) == 1:
++        summary["content_concurrency"] = content_concurrency_values.pop()
++    layout_concurrency_values = {
++        row.get("metrics", {}).get("layout_concurrency")
++        for row in ok_rows
++        if row.get("metrics", {}).get("layout_concurrency") is not None
++    }
++    if len(layout_concurrency_values) == 1:
++        summary["layout_concurrency"] = layout_concurrency_values.pop()
++    for source_key, summary_key in (
++        ("throughput_wall_elapsed_s", "throughput_wall_elapsed_s"),
++        ("throughput_layout_wall_elapsed_s", "throughput_layout_wall_elapsed_s"),
++        ("throughput_extract_wall_elapsed_s", "throughput_extract_wall_elapsed_s"),
++    ):
++        values = {
++            row.get("metrics", {}).get(source_key)
++            for row in ok_rows
++            if row.get("metrics", {}).get(source_key) is not None
++        }
++        if len(values) == 1:
++            summary[summary_key] = values.pop()
++    wall_elapsed = summary.get("throughput_wall_elapsed_s")
++    if wall_elapsed:
++        summary["throughput_pages_per_s"] = len(ok_rows) / wall_elapsed
++        summary["throughput_markdown_chars_per_s"] = markdown_chars / wall_elapsed
++    return summary
++
++
++def _normalize_text(text: str) -> str:
++    return " ".join(text.split())
++
++
++def _similarity(lhs: str, rhs: str) -> float | None:
++    if not lhs or not rhs:
++        return None
++    return SequenceMatcher(
++        None,
++        _normalize_text(lhs),
++        _normalize_text(rhs),
++        autojunk=False,
++    ).ratio()
++
++
++def compare_suite_rows(
++    baseline_rows: Sequence[dict[str, Any]],
++    candidate_rows: Sequence[dict[str, Any]],
++) -> dict[str, Any]:
++    baseline_by_id = {row["case_id"]: row for row in baseline_rows}
++    candidate_by_id = {row["case_id"]: row for row in candidate_rows}
++    case_ids = sorted(set(baseline_by_id) | set(candidate_by_id))
++    cases = []
++    for case_id in case_ids:
++        baseline = baseline_by_id.get(case_id)
++        candidate = candidate_by_id.get(case_id)
++        baseline_latency = _latency(baseline) if baseline else None
++        candidate_latency = _latency(candidate) if candidate else None
++        baseline_blocks = parse_layout_blocks(baseline.get("layout_output", "")) if baseline else []
++        candidate_blocks = parse_layout_blocks(candidate.get("layout_output", "")) if candidate else []
++        matches, precision, recall, f1 = compare_layout_blocks(
++            baseline_blocks,
++            candidate_blocks,
++        )
++        cases.append(
++            {
++                "case_id": case_id,
++                "doc_id": (baseline or candidate or {}).get("doc_id"),
++                "page_index": (baseline or candidate or {}).get("page_index"),
++                "baseline_ok": bool(baseline and baseline.get("ok")),
++                "candidate_ok": bool(candidate and candidate.get("ok")),
++                "baseline_latency_s": baseline_latency,
++                "candidate_latency_s": candidate_latency,
++                "speedup": (
++                    baseline_latency / candidate_latency
++                    if baseline_latency and candidate_latency
++                    else None
++                ),
++                "markdown_similarity": _similarity(
++                    baseline.get("markdown", "") if baseline else "",
++                    candidate.get("markdown", "") if candidate else "",
++                ),
++                "baseline_blocks": len(baseline_blocks),
++                "candidate_blocks": len(candidate_blocks),
++                "layout_matched_blocks": matches,
++                "layout_precision": precision,
++                "layout_recall": recall,
++                "layout_f1": f1,
++                "baseline_type_counts": baseline.get("block_type_counts", {}) if baseline else {},
++                "candidate_type_counts": candidate.get("block_type_counts", {}) if candidate else {},
++            }
++        )
++
++    matched_ok = [
++        item
++        for item in cases
++        if item["baseline_ok"] and item["candidate_ok"]
++    ]
++    similarities = [
++        item["markdown_similarity"]
++        for item in matched_ok
++        if item["markdown_similarity"] is not None
++    ]
++    layout_f1s = [item["layout_f1"] for item in matched_ok]
++    baseline_total = sum(
++        item["baseline_latency_s"] or 0.0 for item in matched_ok
++    )
++    candidate_total = sum(
++        item["candidate_latency_s"] or 0.0 for item in matched_ok
++    )
++    summary = {
++        "num_cases": len(cases),
++        "num_matched_ok": len(matched_ok),
++        "baseline_total_latency_s": baseline_total,
++        "candidate_total_latency_s": candidate_total,
++        "total_speedup": (
++            baseline_total / candidate_total if candidate_total > 0 else None
++        ),
++        "mean_speedup": statistics.mean(
++            item["speedup"] for item in matched_ok if item["speedup"] is not None
++        )
++        if any(item["speedup"] is not None for item in matched_ok)
++        else None,
++        "mean_markdown_similarity": (
++            statistics.mean(similarities) if similarities else None
++        ),
++        "min_markdown_similarity": min(similarities) if similarities else None,
++        "mean_layout_f1": statistics.mean(layout_f1s) if layout_f1s else None,
++        "min_layout_f1": min(layout_f1s) if layout_f1s else None,
++    }
++    return {"summary": summary, "cases": cases}
++
++
++def write_run_outputs(output_dir: Path, rows: Sequence[dict[str, Any]]) -> tuple[Path, Path]:
++    timestamp = int(time.time())
++    results_path = output_dir / f"results_{timestamp}.jsonl"
++    summary_path = output_dir / f"summary_{timestamp}.json"
++    summary = summarize_suite_rows(rows)
++    _write_jsonl(results_path, rows)
++    summary_path.write_text(
++        json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
++        encoding="utf-8",
++    )
++    _write_jsonl(output_dir / "latest_results.jsonl", rows)
++    (output_dir / "latest_summary.json").write_text(
++        json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
++        encoding="utf-8",
++    )
++    return results_path, summary_path
++
++
++def run_dllm_suite(
++    cases: Sequence[PageCase],
++    *,
++    output_dir: Path,
++    endpoint: str,
++    model: str,
++    timeout: float,
++    layout_max_tokens: int,
++    content_max_tokens: int,
++    table_max_tokens: int,
++    formula_max_tokens: int,
++    block_size: int,
++    dynamic_threshold: float,
++    content_concurrency: int,
++    max_denoising_steps: int | None = None,
++    keep_paratext: bool = False,
++) -> list[dict[str, Any]]:
++    output_dir.mkdir(parents=True, exist_ok=True)
++    client = End2EndOpenAIClient(
++        endpoint=endpoint,
++        model=model,
++        timeout=timeout,
++        block_size=block_size,
++        dynamic_threshold=dynamic_threshold,
++        max_denoising_steps=max_denoising_steps,
++    )
++    rows: list[dict[str, Any]] = []
++    for case in cases:
++        try:
++            result = run_end2end(
++                End2EndConfig(
++                    image_path=case.image_path,
++                    output_dir=output_dir / "cases" / case.case_id,
++                    endpoint=endpoint,
++                    model=model,
++                    timeout=timeout,
++                    layout_max_tokens=layout_max_tokens,
++                    content_max_tokens=content_max_tokens,
++                    table_max_tokens=table_max_tokens,
++                    formula_max_tokens=formula_max_tokens,
++                    block_size=block_size,
++                    max_denoising_steps=max_denoising_steps,
++                    dynamic_threshold=dynamic_threshold,
++                    content_concurrency=content_concurrency,
++                    keep_paratext=keep_paratext,
++                ),
++                client=client,
++            )
++            rows.append(
++                make_result_row(
++                    case,
++                    ok=True,
++                    metrics=result.metrics,
++                    blocks=result.blocks,
++                    markdown=result.markdown,
++                    layout_output=blocks_to_layout_text(result.blocks),
++                )
++            )
++        except Exception as exc:
++            rows.append(make_result_row(case, ok=False, error=repr(exc)))
++    return rows
++
++
++def run_dllm_throughput_suite(
++    cases: Sequence[PageCase],
++    *,
++    output_dir: Path,
++    endpoint: str,
++    model: str,
++    timeout: float,
++    layout_max_tokens: int,
++    content_max_tokens: int,
++    table_max_tokens: int,
++    formula_max_tokens: int,
++    block_size: int,
++    dynamic_threshold: float,
++    layout_concurrency: int,
++    content_concurrency: int,
++    max_denoising_steps: int | None = None,
++    keep_paratext: bool = False,
++    client: End2EndClient | None = None,
++) -> list[dict[str, Any]]:
++    output_dir.mkdir(parents=True, exist_ok=True)
++    client = client or End2EndOpenAIClient(
++        endpoint=endpoint,
++        model=model,
++        timeout=timeout,
++        block_size=block_size,
++        dynamic_threshold=dynamic_threshold,
++        max_denoising_steps=max_denoising_steps,
++    )
++    configs = [
++        End2EndConfig(
++            image_path=case.image_path,
++            output_dir=output_dir / "cases" / case.case_id,
++            endpoint=endpoint,
++            model=model,
++            timeout=timeout,
++            layout_max_tokens=layout_max_tokens,
++            content_max_tokens=content_max_tokens,
++            table_max_tokens=table_max_tokens,
++            formula_max_tokens=formula_max_tokens,
++            block_size=block_size,
++            max_denoising_steps=max_denoising_steps,
++            dynamic_threshold=dynamic_threshold,
++            content_concurrency=content_concurrency,
++            keep_paratext=keep_paratext,
++        )
++        for case in cases
++    ]
++    try:
++        results = run_end2end_batch(
++            configs,
++            client=client,
++            layout_concurrency=layout_concurrency,
++            content_concurrency=content_concurrency,
++        )
++    except Exception as exc:
++        return [make_result_row(case, ok=False, error=repr(exc)) for case in cases]
++
++    rows: list[dict[str, Any]] = []
++    for case, result in zip(cases, results):
++        rows.append(
++            make_result_row(
++                case,
++                ok=True,
++                metrics=result.metrics,
++                blocks=result.blocks,
++                markdown=result.markdown,
++                layout_output=blocks_to_layout_text(result.blocks),
++            )
++        )
++    return rows
++
++
++def _run_mineru_client_page(
++    client: Any,
++    image: Image.Image,
++    *,
++    image_analysis: bool,
++) -> tuple[list[Any], dict[str, Any]]:
++    started = time.perf_counter()
++    layout_start = time.perf_counter()
++    layout_result = client.layout_detect(image)
++    layout_elapsed = time.perf_counter() - layout_start
++
++    extract_start = time.perf_counter()
++    block_images, prompts, params, indices = client.helper.prepare_for_extract(
++        image,
++        layout_result,
++        None,
++        image_analysis,
++    )
++    outputs = client._batch_predict(block_images, prompts, params, None, None)
++    for index, output in zip(indices, outputs):
++        layout_result[index].content = output.text
++        layout_result[index].scored = output.scored
++    blocks = client.helper.post_process(layout_result)
++    extract_elapsed = time.perf_counter() - extract_start
++    markdown = blocks_to_markdown(blocks)
++    metrics = {
++        "layout_elapsed": layout_elapsed,
++        "extract_elapsed": extract_elapsed,
++        "total_elapsed": time.perf_counter() - started,
++        "num_blocks": len(blocks),
++        "num_extracted_blocks": len(indices),
++        "markdown_chars": len(markdown),
++    }
++    return blocks, metrics
++
++
++def run_mineru_client_suite(
++    cases: Sequence[PageCase],
++    *,
++    output_dir: Path,
++    endpoint: str,
++    model: str,
++    timeout: int,
++    max_concurrency: int,
++    image_analysis: bool,
++    keep_paratext: bool = False,
++) -> list[dict[str, Any]]:
++    from mineru_vl_utils import MinerUClient
++
++    output_dir.mkdir(parents=True, exist_ok=True)
++    client = MinerUClient(
++        backend="http-client",
++        server_url=endpoint,
++        model_name=model,
++        http_timeout=timeout,
++        max_concurrency=max_concurrency,
++        image_analysis=image_analysis,
++        enable_table_formula_eq_wrap=True,
++        enable_cross_page_table_merge=True,
++        skip_model_name_checking=True,
++        use_tqdm=False,
++    )
++    rows: list[dict[str, Any]] = []
++    for case in cases:
++        try:
++            with Image.open(case.image_path) as image:
++                blocks, metrics = _run_mineru_client_page(
++                    client,
++                    image.convert("RGB"),
++                    image_analysis=image_analysis,
++                )
++            rows.append(
++                make_result_row(
++                    case,
++                    ok=True,
++                    metrics=metrics,
++                    blocks=blocks,
++                    markdown=blocks_to_markdown(blocks, keep_paratext=keep_paratext),
++                    layout_output=blocks_to_layout_text(blocks),
++                )
++            )
++        except Exception as exc:
++            rows.append(make_result_row(case, ok=False, error=repr(exc)))
++    return rows
++
++
++def run_mineru_client_throughput_suite(
++    cases: Sequence[PageCase],
++    *,
++    output_dir: Path,
++    endpoint: str,
++    model: str,
++    timeout: int,
++    max_concurrency: int,
++    image_analysis: bool,
++    keep_paratext: bool = False,
++) -> list[dict[str, Any]]:
++    from mineru_vl_utils import MinerUClient
++
++    output_dir.mkdir(parents=True, exist_ok=True)
++    client = MinerUClient(
++        backend="http-client",
++        server_url=endpoint,
++        model_name=model,
++        http_timeout=timeout,
++        max_concurrency=max_concurrency,
++        image_analysis=image_analysis,
++        enable_table_formula_eq_wrap=True,
++        enable_cross_page_table_merge=True,
++        skip_model_name_checking=True,
++        use_tqdm=False,
++    )
++    images: list[Image.Image] = []
++    try:
++        for case in cases:
++            images.append(Image.open(case.image_path).convert("RGB"))
++
++        started = time.perf_counter()
++        layout_start = time.perf_counter()
++        layout_results = client.batch_layout_detect(images)
++        layout_wall_elapsed = time.perf_counter() - layout_start
++
++        extract_start = time.perf_counter()
++        prepared_inputs = client.helper.batch_prepare_for_extract(
++            client.executor,
++            images,
++            layout_results,
++            None,
++            image_analysis,
++        )
++        all_images, all_prompts, all_params, all_indices = client._flatten_prepared_inputs(
++            prepared_inputs
++        )
++        outputs = client._batch_predict(
++            all_images,
++            all_prompts,
++            all_params,
++            None,
++            None,
++        )
++        for (image_index, block_index), output in zip(all_indices, outputs):
++            layout_results[image_index][block_index].content = output.text
++            layout_results[image_index][block_index].scored = output.scored
++        processed_list = client.helper.batch_post_process(
++            client.executor,
++            layout_results,
++        )
++        extract_wall_elapsed = time.perf_counter() - extract_start
++        wall_elapsed = time.perf_counter() - started
++    except Exception as exc:
++        return [make_result_row(case, ok=False, error=repr(exc)) for case in cases]
++    finally:
++        for image in images:
++            image.close()
++
++    extracted_counts = Counter(image_index for image_index, _ in all_indices)
++    rows: list[dict[str, Any]] = []
++    for image_index, (case, blocks) in enumerate(zip(cases, processed_list)):
++        markdown = blocks_to_markdown(blocks, keep_paratext=keep_paratext)
++        metrics = {
++            "num_blocks": len(blocks),
++            "num_extracted_blocks": extracted_counts.get(image_index, 0),
++            "markdown_chars": len(markdown),
++            "layout_concurrency": max_concurrency,
++            "content_concurrency": max_concurrency,
++            "throughput_batch_size": len(cases),
++            "throughput_wall_elapsed_s": wall_elapsed,
++            "throughput_layout_wall_elapsed_s": layout_wall_elapsed,
++            "throughput_extract_wall_elapsed_s": extract_wall_elapsed,
++        }
++        rows.append(
++            make_result_row(
++                case,
++                ok=True,
++                metrics=metrics,
++                blocks=blocks,
++                markdown=markdown,
++                layout_output=blocks_to_layout_text(blocks),
++            )
++        )
++    return rows
++
++
++def _parse_source_args(values: Sequence[str]) -> list[PdfSource]:
++    sources: list[PdfSource] = []
++    for value in values:
++        parts = value.split(":", 2)
++        if len(parts) == 1:
++            path = Path(parts[0])
++            sources.append(PdfSource(path.stem, path, "all"))
++        elif len(parts) == 2:
++            doc_id, path = parts
++            sources.append(PdfSource(doc_id, Path(path), "all"))
++        else:
++            doc_id, path, pages = parts
++            sources.append(PdfSource(doc_id, Path(path), pages))
++    return sources
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    subparsers = parser.add_subparsers(dest="command", required=True)
++
++    render = subparsers.add_parser("render")
++    render.add_argument("--output-dir", type=Path, required=True)
++    render.add_argument("--scale", type=float, default=2.0)
++    render.add_argument("--source", action="append", default=[])
++    render.add_argument("--preset", choices=["coverage"], default="coverage")
++
++    run_dllm = subparsers.add_parser("run-dllm")
++    run_dllm.add_argument("--manifest", type=Path, required=True)
++    run_dllm.add_argument("--output-dir", type=Path, required=True)
++    run_dllm.add_argument("--endpoint", default="http://127.0.0.1:18084/v1/chat/completions")
++    run_dllm.add_argument("--model", default="mineru-diffusion")
++    run_dllm.add_argument("--timeout", type=float, default=600.0)
++    run_dllm.add_argument("--layout-max-tokens", type=int, default=2048)
++    run_dllm.add_argument("--content-max-tokens", type=int, default=1024)
++    run_dllm.add_argument("--table-max-tokens", type=int, default=2048)
++    run_dllm.add_argument("--formula-max-tokens", type=int, default=1024)
++    run_dllm.add_argument("--block-size", type=int, default=32)
++    run_dllm.add_argument("--dynamic-threshold", type=float, default=0.95)
++    run_dllm.add_argument("--max-denoising-steps", type=int)
++    run_dllm.add_argument("--content-concurrency", type=int, default=1)
++    run_dllm.add_argument("--keep-paratext", action="store_true")
++
++    run_dllm_throughput = subparsers.add_parser("run-dllm-throughput")
++    run_dllm_throughput.add_argument("--manifest", type=Path, required=True)
++    run_dllm_throughput.add_argument("--output-dir", type=Path, required=True)
++    run_dllm_throughput.add_argument(
++        "--endpoint",
++        default="http://127.0.0.1:18084/v1/chat/completions",
++    )
++    run_dllm_throughput.add_argument("--model", default="mineru-diffusion")
++    run_dllm_throughput.add_argument("--timeout", type=float, default=600.0)
++    run_dllm_throughput.add_argument("--layout-max-tokens", type=int, default=2048)
++    run_dllm_throughput.add_argument("--content-max-tokens", type=int, default=1024)
++    run_dllm_throughput.add_argument("--table-max-tokens", type=int, default=2048)
++    run_dllm_throughput.add_argument("--formula-max-tokens", type=int, default=1024)
++    run_dllm_throughput.add_argument("--block-size", type=int, default=32)
++    run_dllm_throughput.add_argument("--dynamic-threshold", type=float, default=0.95)
++    run_dllm_throughput.add_argument("--max-denoising-steps", type=int)
++    run_dllm_throughput.add_argument("--layout-concurrency", type=int, default=4)
++    run_dllm_throughput.add_argument("--content-concurrency", type=int, default=8)
++    run_dllm_throughput.add_argument("--keep-paratext", action="store_true")
++
++    run_mineru = subparsers.add_parser("run-mineru-client")
++    run_mineru.add_argument("--manifest", type=Path, required=True)
++    run_mineru.add_argument("--output-dir", type=Path, required=True)
++    run_mineru.add_argument("--endpoint", default="http://127.0.0.1:30000")
++    run_mineru.add_argument("--model", default="mineru2.5-pro")
++    run_mineru.add_argument("--timeout", type=int, default=600)
++    run_mineru.add_argument("--max-concurrency", type=int, default=8)
++    run_mineru.add_argument("--disable-image-analysis", action="store_true")
++    run_mineru.add_argument("--keep-paratext", action="store_true")
++
++    run_mineru_throughput = subparsers.add_parser("run-mineru-client-throughput")
++    run_mineru_throughput.add_argument("--manifest", type=Path, required=True)
++    run_mineru_throughput.add_argument("--output-dir", type=Path, required=True)
++    run_mineru_throughput.add_argument("--endpoint", default="http://127.0.0.1:30000")
++    run_mineru_throughput.add_argument("--model", default="mineru2.5-pro")
++    run_mineru_throughput.add_argument("--timeout", type=int, default=600)
++    run_mineru_throughput.add_argument("--max-concurrency", type=int, default=8)
++    run_mineru_throughput.add_argument("--disable-image-analysis", action="store_true")
++    run_mineru_throughput.add_argument("--keep-paratext", action="store_true")
++
++    compare = subparsers.add_parser("compare")
++    compare.add_argument("--baseline", type=Path, required=True)
++    compare.add_argument("--candidate", type=Path, required=True)
++    compare.add_argument("--output", type=Path, required=True)
++    return parser.parse_args()
++
++
++def main() -> None:
++    args = parse_args()
++    if args.command == "render":
++        sources = _parse_source_args(args.source) if args.source else default_pdf_sources()
++        cases = render_pdf_sources(sources, args.output_dir, scale=args.scale)
++        print(json.dumps({"num_cases": len(cases)}, indent=2, ensure_ascii=False))
++    elif args.command == "run-dllm":
++        rows = run_dllm_suite(
++            load_manifest(args.manifest),
++            output_dir=args.output_dir,
++            endpoint=args.endpoint,
++            model=args.model,
++            timeout=args.timeout,
++            layout_max_tokens=args.layout_max_tokens,
++            content_max_tokens=args.content_max_tokens,
++            table_max_tokens=args.table_max_tokens,
++            formula_max_tokens=args.formula_max_tokens,
++            block_size=args.block_size,
++            dynamic_threshold=args.dynamic_threshold,
++            content_concurrency=args.content_concurrency,
++            max_denoising_steps=args.max_denoising_steps,
++            keep_paratext=args.keep_paratext,
++        )
++        results_path, summary_path = write_run_outputs(args.output_dir, rows)
++        print(json.dumps({"results": str(results_path), "summary": str(summary_path)}, indent=2))
++    elif args.command == "run-dllm-throughput":
++        rows = run_dllm_throughput_suite(
++            load_manifest(args.manifest),
++            output_dir=args.output_dir,
++            endpoint=args.endpoint,
++            model=args.model,
++            timeout=args.timeout,
++            layout_max_tokens=args.layout_max_tokens,
++            content_max_tokens=args.content_max_tokens,
++            table_max_tokens=args.table_max_tokens,
++            formula_max_tokens=args.formula_max_tokens,
++            block_size=args.block_size,
++            dynamic_threshold=args.dynamic_threshold,
++            layout_concurrency=args.layout_concurrency,
++            content_concurrency=args.content_concurrency,
++            max_denoising_steps=args.max_denoising_steps,
++            keep_paratext=args.keep_paratext,
++        )
++        results_path, summary_path = write_run_outputs(args.output_dir, rows)
++        print(json.dumps({"results": str(results_path), "summary": str(summary_path)}, indent=2))
++    elif args.command == "run-mineru-client":
++        rows = run_mineru_client_suite(
++            load_manifest(args.manifest),
++            output_dir=args.output_dir,
++            endpoint=args.endpoint,
++            model=args.model,
++            timeout=args.timeout,
++            max_concurrency=args.max_concurrency,
++            image_analysis=not args.disable_image_analysis,
++            keep_paratext=args.keep_paratext,
++        )
++        results_path, summary_path = write_run_outputs(args.output_dir, rows)
++        print(json.dumps({"results": str(results_path), "summary": str(summary_path)}, indent=2))
++    elif args.command == "run-mineru-client-throughput":
++        rows = run_mineru_client_throughput_suite(
++            load_manifest(args.manifest),
++            output_dir=args.output_dir,
++            endpoint=args.endpoint,
++            model=args.model,
++            timeout=args.timeout,
++            max_concurrency=args.max_concurrency,
++            image_analysis=not args.disable_image_analysis,
++            keep_paratext=args.keep_paratext,
++        )
++        results_path, summary_path = write_run_outputs(args.output_dir, rows)
++        print(json.dumps({"results": str(results_path), "summary": str(summary_path)}, indent=2))
++    elif args.command == "compare":
++        payload = compare_suite_rows(
++            _read_jsonl(args.baseline),
++            _read_jsonl(args.candidate),
++        )
++        args.output.parent.mkdir(parents=True, exist_ok=True)
++        args.output.write_text(
++            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
++            encoding="utf-8",
++        )
++        print(json.dumps(payload["summary"], indent=2, ensure_ascii=False))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/benchmarks/mineru_diffusion/harness.py b/benchmarks/mineru_diffusion/harness.py
+new file mode 100644
+index 00000000..531d7dc0
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/harness.py
+@@ -0,0 +1,154 @@
++from __future__ import annotations
++
++import base64
++import json
++import statistics
++from dataclasses import asdict, dataclass
++from pathlib import Path
++from typing import Any
++
++
++TASK_PROMPTS = {
++    "text": "\nText Recognition:",
++    "table": "\nTable Recognition:",
++    "formula": "\nFormula Recognition:",
++    "layout": "\nLayout Analysis:",
++}
++
++STOP_STRINGS = ("<|endoftext|>", "<|im_end|>")
++
++
++@dataclass(frozen=True)
++class BenchmarkCase:
++    case_id: str
++    image: str
++    prompt: str
++    max_tokens: int | None = None
++
++    def to_payload(self) -> dict[str, Any]:
++        payload = {
++            "case_id": self.case_id,
++            "messages": [
++                {
++                    "role": "user",
++                    "content": [
++                        {"type": "image_url", "image_url": {"url": self.image}},
++                        {"type": "text", "text": self.prompt},
++                    ],
++                }
++            ],
++        }
++        if self.max_tokens is not None:
++            payload["max_tokens"] = self.max_tokens
++        return payload
++
++
++@dataclass(frozen=True)
++class BenchmarkResult:
++    case_id: str
++    ok: bool
++    latency_s: float
++    output_text: str
++    error: str | None
++
++    def to_json(self) -> str:
++        return json.dumps(asdict(self), ensure_ascii=False)
++
++
++def _image_url_to_path_or_data(url: str) -> str:
++    if url.startswith("data:"):
++        header, encoded = url.split(",", 1)
++        suffix = ".png"
++        if "jpeg" in header or "jpg" in header:
++            suffix = ".jpg"
++        data = base64.b64decode(encoded)
++        tmp = Path("/tmp") / f"mineru_diffusion_{abs(hash(url))}{suffix}"
++        tmp.write_bytes(data)
++        return str(tmp)
++    if url.startswith("file://"):
++        return url[len("file://") :]
++    return url
++
++
++def extract_openai_image_and_prompt(payload: dict[str, Any]) -> tuple[str | None, str]:
++    image: str | None = None
++    text_parts: list[str] = []
++
++    for message in payload.get("messages", []):
++        if message.get("role") not in {"user", "system"}:
++            continue
++        content = message.get("content")
++        if isinstance(content, str):
++            if message.get("role") == "user":
++                text_parts.append(content)
++            continue
++        if not isinstance(content, list):
++            continue
++        for item in content:
++            if not isinstance(item, dict):
++                continue
++            item_type = item.get("type")
++            if item_type in {"text", "input_text"}:
++                text = item.get("text")
++                if isinstance(text, str):
++                    text_parts.append(text)
++            elif item_type in {"image_url", "input_image"}:
++                image_url = item.get("image_url")
++                if isinstance(image_url, dict):
++                    url = image_url.get("url")
++                else:
++                    url = image_url or item.get("image")
++                if isinstance(url, str):
++                    image = _image_url_to_path_or_data(url)
++
++    return image, "".join(text_parts)
++
++
++def read_cases(path: Path) -> list[dict[str, Any]]:
++    cases = []
++    with path.open(encoding="utf-8") as f:
++        for line in f:
++            if line.strip():
++                cases.append(json.loads(line))
++    return cases
++
++
++def write_default_cases(
++    output: Path,
++    image: str,
++    *,
++    task_max_tokens: Mapping[str, int] | None = None,
++) -> None:
++    output.parent.mkdir(parents=True, exist_ok=True)
++    task_max_tokens = task_max_tokens or {}
++    cases = [
++        BenchmarkCase(
++            case_id=task,
++            image=image,
++            prompt=prompt,
++            max_tokens=task_max_tokens.get(task),
++        ).to_payload()
++        for task, prompt in TASK_PROMPTS.items()
++    ]
++    output.write_text(
++        "".join(json.dumps(case, ensure_ascii=False) + "\n" for case in cases),
++        encoding="utf-8",
++    )
++
++
++def summarize_results(results: list[BenchmarkResult]) -> dict[str, Any]:
++    ok_results = [result for result in results if result.ok]
++    total_latency = sum(result.latency_s for result in ok_results)
++    total_chars = sum(len(result.output_text) for result in ok_results)
++    latencies = [result.latency_s for result in ok_results]
++
++    return {
++        "num_requests": len(results),
++        "num_ok": len(ok_results),
++        "num_failed": len(results) - len(ok_results),
++        "mean_latency_s": statistics.mean(latencies) if latencies else None,
++        "p50_latency_s": statistics.median(latencies) if latencies else None,
++        "max_latency_s": max(latencies) if latencies else None,
++        "output_chars": total_chars,
++        "output_chars_per_s": total_chars / total_latency if total_latency else 0.0,
++    }
+diff --git a/benchmarks/mineru_diffusion/hf_server.py b/benchmarks/mineru_diffusion/hf_server.py
+new file mode 100644
+index 00000000..5bc4df55
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/hf_server.py
+@@ -0,0 +1,207 @@
++from __future__ import annotations
++
++import argparse
++import time
++from pathlib import Path
++from typing import Any
++
++import torch
++import uvicorn
++from fastapi import FastAPI, HTTPException
++from pydantic import BaseModel, Field
++from transformers import AutoModel, AutoProcessor, AutoTokenizer
++
++from benchmarks.mineru_diffusion.harness import extract_openai_image_and_prompt
++
++
++STOP_STRINGS = ("<|endoftext|>", "<|im_end|>")
++SYSTEM_PROMPT = "You are a helpful assistant."
++
++
++class ChatRequest(BaseModel):
++    model: str | None = None
++    messages: list[dict[str, Any]]
++    max_tokens: int = Field(default=1024, ge=1)
++    temperature: float = 1.0
++    block_size: int = Field(default=32, ge=1)
++    dynamic_threshold: float = 0.95
++
++
++class MinerUHFEngine:
++    def __init__(
++        self,
++        model_path: Path,
++        *,
++        device: str,
++        dtype: torch.dtype,
++        max_length: int,
++        remask_strategy: str,
++    ) -> None:
++        self.model_path = model_path
++        self.device = device
++        self.dtype = dtype
++        self.max_length = max_length
++        self.remask_strategy = remask_strategy
++        self.tokenizer = AutoTokenizer.from_pretrained(
++            model_path,
++            trust_remote_code=True,
++        )
++        self.processor = AutoProcessor.from_pretrained(
++            model_path,
++            trust_remote_code=True,
++            use_fast=False,
++        )
++        self.model = AutoModel.from_pretrained(
++            model_path,
++            trust_remote_code=True,
++            dtype=dtype,
++            low_cpu_mem_usage=True,
++        ).eval()
++        self.model.to(device)
++        self.mask_token_id = self.tokenizer.convert_tokens_to_ids("<|MASK|>")
++
++    def _trim_response(self, text: str) -> str:
++        for stop in STOP_STRINGS:
++            text = text.split(stop, 1)[0]
++        return text.strip()
++
++    @torch.no_grad()
++    def generate(
++        self,
++        *,
++        image: str | None,
++        prompt: str,
++        max_tokens: int,
++        block_size: int,
++        temperature: float,
++        dynamic_threshold: float,
++    ) -> str:
++        if image is None:
++            raise ValueError("MinerU-Diffusion requests must include an image")
++
++        messages = [
++            {"role": "system", "content": [{"type": "text", "text": SYSTEM_PROMPT}]},
++            {
++                "role": "user",
++                "content": [
++                    {"type": "image", "image": image},
++                    {"type": "text", "text": prompt},
++                ],
++            },
++        ]
++        prompt_text = self.processor.apply_chat_template(
++            messages,
++            add_generation_prompt=True,
++        )
++        inputs = self.processor(
++            images=[image],
++            text=prompt_text,
++            truncation=True,
++            max_length=self.max_length,
++            return_tensors="pt",
++        )
++        input_ids = inputs["input_ids"].to(torch.long).to(self.device)
++        image_grid_thw = inputs.get("image_grid_thw")
++        if image_grid_thw is not None:
++            image_grid_thw = image_grid_thw.to(torch.long).to(self.device)
++        pixel_values = inputs["pixel_values"].to(self.dtype).to(self.device)
++
++        gen_length = max_tokens
++        if gen_length % block_size != 0:
++            gen_length = ((gen_length + block_size - 1) // block_size) * block_size
++
++        response_ids, _, _ = self.model.generate(
++            pixel_values=pixel_values,
++            image_grid_thw=image_grid_thw,
++            input_ids=input_ids,
++            mask_token_id=self.mask_token_id,
++            denoising_steps=block_size,
++            gen_length=gen_length,
++            block_length=block_size,
++            temperature=temperature,
++            remasking_strategy=self.remask_strategy,
++            dynamic_threshold=dynamic_threshold,
++            tokenizer=self.tokenizer,
++            stopping_criteria=list(STOP_STRINGS),
++        )
++        return self._trim_response(
++            self.tokenizer.decode(response_ids[0], skip_special_tokens=False)
++        )
++
++
++def create_app(engine: MinerUHFEngine) -> FastAPI:
++    app = FastAPI(title="MinerU-Diffusion HF compatibility server")
++
++    @app.get("/health")
++    def health() -> dict[str, str]:
++        return {"status": "ok"}
++
++    @app.post("/v1/chat/completions")
++    def chat_completions(request: ChatRequest) -> dict[str, Any]:
++        started = time.perf_counter()
++        try:
++            image, prompt = extract_openai_image_and_prompt(request.model_dump())
++            output = engine.generate(
++                image=image,
++                prompt=prompt,
++                max_tokens=request.max_tokens,
++                block_size=request.block_size,
++                temperature=request.temperature,
++                dynamic_threshold=request.dynamic_threshold,
++            )
++        except Exception as exc:
++            raise HTTPException(status_code=500, detail=str(exc)) from exc
++
++        return {
++            "id": f"mineru-hf-{int(started * 1000)}",
++            "object": "chat.completion",
++            "created": int(time.time()),
++            "model": request.model or "mineru-diffusion-hf",
++            "choices": [
++                {
++                    "index": 0,
++                    "message": {"role": "assistant", "content": output},
++                    "finish_reason": "stop",
++                }
++            ],
++            "usage": {
++                "prompt_tokens": None,
++                "completion_tokens": None,
++                "total_tokens": None,
++            },
++            "mineru_metrics": {"latency_s": time.perf_counter() - started},
++        }
++
++    return app
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--model-path", required=True)
++    parser.add_argument("--host", default="127.0.0.1")
++    parser.add_argument("--port", type=int, default=18082)
++    parser.add_argument("--device", default="cuda:0")
++    parser.add_argument(
++        "--dtype",
++        choices=["bfloat16", "float16", "float32"],
++        default="bfloat16",
++    )
++    parser.add_argument("--max-length", type=int, default=4096)
++    parser.add_argument("--remask-strategy", default="low_confidence_dynamic")
++    return parser.parse_args()
++
++
++def main() -> None:
++    args = parse_args()
++    engine = MinerUHFEngine(
++        Path(args.model_path).expanduser().resolve(),
++        device=args.device,
++        dtype=getattr(torch, args.dtype),
++        max_length=args.max_length,
++        remask_strategy=args.remask_strategy,
++    )
++    uvicorn.run(create_app(engine), host=args.host, port=args.port)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/benchmarks/mineru_diffusion/layout_sampling_experiment.py b/benchmarks/mineru_diffusion/layout_sampling_experiment.py
+new file mode 100644
+index 00000000..46a6c311
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/layout_sampling_experiment.py
+@@ -0,0 +1,503 @@
++from __future__ import annotations
++
++import argparse
++import base64
++import json
++import statistics
++import threading
++import time
++from concurrent.futures import ThreadPoolExecutor, as_completed
++from dataclasses import dataclass
++from io import BytesIO
++from pathlib import Path
++from typing import Any, Sequence
++
++import requests
++from PIL import Image
++
++from benchmarks.mineru_diffusion.compare_results import (
++    compare_layout_blocks,
++    parse_layout_blocks,
++)
++from benchmarks.mineru_diffusion.end2end_openai import (
++    SYSTEM_PROMPT,
++    TASK_PROMPTS,
++    parse_layout_output,
++    prepare_layout_image,
++)
++from benchmarks.mineru_diffusion.end2end_suite import (
++    PageCase,
++    blocks_to_layout_text,
++    load_manifest,
++    make_result_row,
++    write_run_outputs,
++)
++from benchmarks.mineru_diffusion.harness import STOP_STRINGS
++
++
++@dataclass(frozen=True)
++class LayoutSamplingVariant:
++    name: str
++    temperature: float
++    top_p: float | None = None
++    top_k: int | None = None
++    presence_penalty: float | None = None
++    frequency_penalty: float | None = None
++    repetition_penalty: float | None = None
++    no_repeat_ngram_size: int | None = None
++
++
++DEFAULT_VARIANT = LayoutSamplingVariant(
++    name="dllm_default_temp1",
++    temperature=1.0,
++)
++
++MINERU_LAYOUT_VARIANT = LayoutSamplingVariant(
++    name="dllm_mineru_layout_sampling",
++    temperature=0.0,
++    top_p=0.01,
++    top_k=1,
++    presence_penalty=0.0,
++    frequency_penalty=0.0,
++    repetition_penalty=1.0,
++    no_repeat_ngram_size=100,
++)
++
++
++class LayoutClient:
++    def __init__(
++        self,
++        *,
++        endpoint: str,
++        model: str,
++        timeout: float,
++        block_size: int,
++        dynamic_threshold: float,
++        max_denoising_steps: int | None,
++    ) -> None:
++        self.endpoint = endpoint
++        self.model = model
++        self.timeout = timeout
++        self.block_size = block_size
++        self.dynamic_threshold = dynamic_threshold
++        self.max_denoising_steps = max_denoising_steps
++        self._thread_local = threading.local()
++
++    def _session(self) -> requests.Session:
++        session = getattr(self._thread_local, "session", None)
++        if session is None:
++            session = requests.Session()
++            session.trust_env = False
++            self._thread_local.session = session
++        return session
++
++    def infer_layout(self, image_url: str, variant: LayoutSamplingVariant) -> str:
++        vllm_xargs: dict[str, Any] = {
++            "block_size": self.block_size,
++            "dynamic_threshold": self.dynamic_threshold,
++        }
++        if self.max_denoising_steps is not None:
++            vllm_xargs["max_denoising_steps"] = self.max_denoising_steps
++        if variant.no_repeat_ngram_size is not None:
++            vllm_xargs["no_repeat_ngram_size"] = variant.no_repeat_ngram_size
++
++        payload: dict[str, Any] = {
++            "model": self.model,
++            "messages": [
++                {"role": "system", "content": SYSTEM_PROMPT},
++                {
++                    "role": "user",
++                    "content": [
++                        {"type": "image_url", "image_url": {"url": image_url}},
++                        {"type": "text", "text": TASK_PROMPTS["[layout]"]},
++                    ],
++                },
++            ],
++            "max_tokens": 2048,
++            "temperature": variant.temperature,
++            "stop": list(STOP_STRINGS),
++            "block_size": self.block_size,
++            "dynamic_threshold": self.dynamic_threshold,
++            "vllm_xargs": vllm_xargs,
++            "skip_special_tokens": False,
++        }
++        for key in (
++            "top_p",
++            "top_k",
++            "presence_penalty",
++            "frequency_penalty",
++            "repetition_penalty",
++        ):
++            value = getattr(variant, key)
++            if value is not None:
++                payload[key] = value
++        if self.max_denoising_steps is not None:
++            payload["max_denoising_steps"] = self.max_denoising_steps
++
++        response = self._session().post(
++            self.endpoint,
++            json=payload,
++            timeout=self.timeout,
++        )
++        response.raise_for_status()
++        text = response.json()["choices"][0]["message"]["content"]
++        for stop in STOP_STRINGS:
++            text = text.split(stop, 1)[0]
++        return text.strip()
++
++
++def image_to_data_url(image_path: Path) -> str:
++    with Image.open(image_path) as image:
++        layout_image = prepare_layout_image(image.convert("RGB"))
++    with BytesIO() as buffer:
++        layout_image.save(buffer, format="PNG")
++        encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
++    return f"data:image/png;base64,{encoded}"
++
++
++def prepare_case_inputs(cases: Sequence[PageCase]) -> dict[str, str]:
++    return {case.case_id: image_to_data_url(case.image_path) for case in cases}
++
++
++def run_variant(
++    cases: Sequence[PageCase],
++    *,
++    image_urls: dict[str, str],
++    client: LayoutClient,
++    variant: LayoutSamplingVariant,
++    output_dir: Path,
++    layout_concurrency: int,
++) -> list[dict[str, Any]]:
++    output_dir.mkdir(parents=True, exist_ok=True)
++    started = time.perf_counter()
++
++    def run_one(case: PageCase) -> dict[str, Any]:
++        layout_start = time.perf_counter()
++        layout_output = client.infer_layout(image_urls[case.case_id], variant)
++        layout_elapsed = time.perf_counter() - layout_start
++        blocks = parse_layout_output(layout_output)
++        layout_text = blocks_to_layout_text(blocks)
++        metrics = {
++            "layout_elapsed": layout_elapsed,
++            "total_elapsed": layout_elapsed,
++            "num_blocks": len(blocks),
++            "num_extracted_blocks": 0,
++            "markdown_chars": 0,
++            "layout_chars": len(layout_text),
++            "layout_raw_chars": len(layout_output),
++            "layout_concurrency": layout_concurrency,
++            "content_concurrency": 0,
++            "sampling_variant": variant.name,
++            "temperature": variant.temperature,
++            "top_p": variant.top_p,
++            "top_k": variant.top_k,
++            "presence_penalty": variant.presence_penalty,
++            "frequency_penalty": variant.frequency_penalty,
++            "repetition_penalty": variant.repetition_penalty,
++            "no_repeat_ngram_size": variant.no_repeat_ngram_size,
++        }
++        return make_result_row(
++            case,
++            ok=True,
++            metrics=metrics,
++            blocks=blocks,
++            markdown="",
++            layout_output=layout_text,
++        )
++
++    rows_by_id: dict[str, dict[str, Any]] = {}
++    with ThreadPoolExecutor(max_workers=layout_concurrency) as executor:
++        futures = {executor.submit(run_one, case): case for case in cases}
++        for future in as_completed(futures):
++            case = futures[future]
++            try:
++                rows_by_id[case.case_id] = future.result()
++            except Exception as exc:
++                rows_by_id[case.case_id] = make_result_row(
++                    case,
++                    ok=False,
++                    error=repr(exc),
++                    metrics={
++                        "sampling_variant": variant.name,
++                        "layout_concurrency": layout_concurrency,
++                    },
++                )
++
++    wall_elapsed = time.perf_counter() - started
++    rows = [rows_by_id[case.case_id] for case in cases]
++    for row in rows:
++        if row.get("ok"):
++            row["metrics"]["throughput_batch_size"] = len(cases)
++            row["metrics"]["throughput_wall_elapsed_s"] = wall_elapsed
++            row["metrics"]["throughput_layout_wall_elapsed_s"] = wall_elapsed
++            row["metrics"]["throughput_extract_wall_elapsed_s"] = 0.0
++
++    write_run_outputs(output_dir, rows)
++    return rows
++
++
++def summarize_layout_rows(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
++    ok_rows = [row for row in rows if row.get("ok")]
++    latencies = [float(row["metrics"]["layout_elapsed"]) for row in ok_rows]
++    total_latency = sum(latencies)
++    layout_chars = sum(int(row["metrics"].get("layout_chars", 0)) for row in ok_rows)
++    raw_chars = sum(int(row["metrics"].get("layout_raw_chars", 0)) for row in ok_rows)
++    blocks = sum(int(row["metrics"].get("num_blocks", 0)) for row in ok_rows)
++    wall_values = {
++        row["metrics"].get("throughput_wall_elapsed_s")
++        for row in ok_rows
++        if row["metrics"].get("throughput_wall_elapsed_s") is not None
++    }
++    wall_elapsed = wall_values.pop() if len(wall_values) == 1 else None
++    return {
++        "num_cases": len(rows),
++        "num_ok": len(ok_rows),
++        "num_failed": len(rows) - len(ok_rows),
++        "layout_total_latency_s": total_latency,
++        "layout_mean_latency_s": statistics.mean(latencies) if latencies else None,
++        "layout_p50_latency_s": statistics.median(latencies) if latencies else None,
++        "layout_max_latency_s": max(latencies) if latencies else None,
++        "throughput_wall_elapsed_s": wall_elapsed,
++        "layout_chars": layout_chars,
++        "layout_raw_chars": raw_chars,
++        "num_blocks": blocks,
++        "layout_chars_per_layout_s": (
++            layout_chars / total_latency if total_latency > 0 else None
++        ),
++    }
++
++
++def compare_layout_rows(
++    baseline_rows: Sequence[dict[str, Any]],
++    candidate_rows: Sequence[dict[str, Any]],
++) -> dict[str, Any]:
++    baseline_by_id = {row["case_id"]: row for row in baseline_rows if row.get("ok")}
++    candidate_by_id = {row["case_id"]: row for row in candidate_rows if row.get("ok")}
++    cases = []
++    for case_id in sorted(set(baseline_by_id) & set(candidate_by_id)):
++        baseline = baseline_by_id[case_id]
++        candidate = candidate_by_id[case_id]
++        baseline_blocks = parse_layout_blocks(baseline.get("layout_output", ""))
++        candidate_blocks = parse_layout_blocks(candidate.get("layout_output", ""))
++        matches, precision, recall, f1 = compare_layout_blocks(
++            baseline_blocks,
++            candidate_blocks,
++        )
++        baseline_latency = float(baseline["metrics"]["layout_elapsed"])
++        candidate_latency = float(candidate["metrics"]["layout_elapsed"])
++        cases.append(
++            {
++                "case_id": case_id,
++                "baseline_latency_s": baseline_latency,
++                "candidate_latency_s": candidate_latency,
++                "speedup": (
++                    baseline_latency / candidate_latency
++                    if candidate_latency > 0
++                    else None
++                ),
++                "baseline_blocks": len(baseline_blocks),
++                "candidate_blocks": len(candidate_blocks),
++                "layout_matched_blocks": matches,
++                "layout_precision": precision,
++                "layout_recall": recall,
++                "layout_f1": f1,
++            }
++        )
++    baseline_total = sum(item["baseline_latency_s"] for item in cases)
++    candidate_total = sum(item["candidate_latency_s"] for item in cases)
++    layout_f1s = [item["layout_f1"] for item in cases]
++    return {
++        "summary": {
++            "num_matched_ok": len(cases),
++            "baseline_total_layout_s": baseline_total,
++            "candidate_total_layout_s": candidate_total,
++            "total_speedup": (
++                baseline_total / candidate_total if candidate_total > 0 else None
++            ),
++            "mean_layout_f1": statistics.mean(layout_f1s) if layout_f1s else None,
++            "min_layout_f1": min(layout_f1s) if layout_f1s else None,
++        },
++        "cases": cases,
++    }
++
++
++def write_experiment_report(
++    output_dir: Path,
++    *,
++    default_rows: Sequence[dict[str, Any]],
++    mineru_rows: Sequence[dict[str, Any]],
++    pro_rows: Sequence[dict[str, Any]] | None,
++) -> None:
++    default_summary = summarize_layout_rows(default_rows)
++    mineru_summary = summarize_layout_rows(mineru_rows)
++    default_vs_mineru = compare_layout_rows(default_rows, mineru_rows)
++
++    payload: dict[str, Any] = {
++        "default_variant": DEFAULT_VARIANT.__dict__,
++        "mineru_layout_variant": MINERU_LAYOUT_VARIANT.__dict__,
++        "default_summary": default_summary,
++        "mineru_layout_summary": mineru_summary,
++        "default_vs_mineru": default_vs_mineru,
++    }
++    if pro_rows is not None:
++        pro_layout_rows = normalize_pro_layout_rows(pro_rows)
++        payload["pro_layout_summary"] = summarize_layout_rows(pro_layout_rows)
++        payload["pro_vs_default"] = compare_layout_rows(pro_layout_rows, default_rows)
++        payload["pro_vs_mineru_layout"] = compare_layout_rows(
++            pro_layout_rows,
++            mineru_rows,
++        )
++
++    (output_dir / "layout_sampling_experiment_summary.json").write_text(
++        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
++        encoding="utf-8",
++    )
++
++    lines = [
++        "# DLLM Layout Sampling Experiment",
++        "",
++        "Scope: layout-only requests on the 23-page PDF coverage suite.",
++        "",
++        "| Variant | OK | Layout total s | Wall s | Mean s | Layout chars | Blocks | Chars/layout-s |",
++        "|---|---:|---:|---:|---:|---:|---:|---:|",
++        _summary_row("DLLM default temp=1", default_summary),
++        _summary_row("DLLM MinerU layout sampling", mineru_summary),
++    ]
++    if pro_rows is not None:
++        lines.append(_summary_row("MinerU2.5-Pro existing layout", payload["pro_layout_summary"]))
++    comparison = default_vs_mineru["summary"]
++    lines.extend(
++        [
++            "",
++            "## Default vs MinerU Layout Sampling",
++            "",
++            f"- Total layout speedup: {comparison['total_speedup']:.4f}x "
++            "(default / MinerU-sampling).",
++            f"- Mean layout F1 between variants: {comparison['mean_layout_f1']:.4f}.",
++        ]
++    )
++    if pro_rows is not None:
++        pro_default = payload["pro_vs_default"]["summary"]
++        pro_mineru = payload["pro_vs_mineru_layout"]["summary"]
++        lines.extend(
++            [
++                "",
++                "## Existing Pro Layout Reference",
++                "",
++                f"- Pro / DLLM default layout speedup: {pro_default['total_speedup']:.4f}x.",
++                f"- Pro / DLLM MinerU-sampling layout speedup: {pro_mineru['total_speedup']:.4f}x.",
++                f"- Pro vs DLLM MinerU-sampling mean layout F1: {pro_mineru['mean_layout_f1']:.4f}.",
++            ]
++        )
++    lines.append("")
++    (output_dir / "layout_sampling_experiment_summary.md").write_text(
++        "\n".join(lines),
++        encoding="utf-8",
++    )
++
++
++def _summary_row(name: str, summary: dict[str, Any]) -> str:
++    wall = summary.get("throughput_wall_elapsed_s")
++    wall_text = f"{wall:.3f}" if wall is not None else "n/a"
++    return (
++        f"| {name} | {summary['num_ok']}/{summary['num_cases']} "
++        f"| {summary['layout_total_latency_s']:.3f} "
++        f"| {wall_text} "
++        f"| {summary['layout_mean_latency_s']:.3f} "
++        f"| {summary['layout_chars']} "
++        f"| {summary['num_blocks']} "
++        f"| {summary['layout_chars_per_layout_s']:.1f} |"
++    )
++
++
++def normalize_pro_layout_rows(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
++    normalized = []
++    for row in rows:
++        copied = json.loads(json.dumps(row, ensure_ascii=False))
++        metrics = copied.setdefault("metrics", {})
++        layout_elapsed = float(metrics.get("layout_elapsed", 0.0))
++        metrics["total_elapsed"] = layout_elapsed
++        metrics["layout_chars"] = len(copied.get("layout_output", ""))
++        metrics["layout_raw_chars"] = metrics["layout_chars"]
++        normalized.append(copied)
++    return normalized
++
++
++def read_jsonl(path: Path) -> list[dict[str, Any]]:
++    rows = []
++    with path.open(encoding="utf-8") as f:
++        for line in f:
++            if line.strip():
++                rows.append(json.loads(line))
++    return rows
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--manifest", type=Path, required=True)
++    parser.add_argument("--output-dir", type=Path, required=True)
++    parser.add_argument(
++        "--endpoint",
++        default="http://127.0.0.1:18084/v1/chat/completions",
++    )
++    parser.add_argument("--model", default="mineru-diffusion")
++    parser.add_argument("--timeout", type=float, default=600.0)
++    parser.add_argument("--block-size", type=int, default=32)
++    parser.add_argument("--dynamic-threshold", type=float, default=0.90)
++    parser.add_argument("--max-denoising-steps", type=int)
++    parser.add_argument("--layout-concurrency", type=int, default=4)
++    parser.add_argument("--pro-results-jsonl", type=Path)
++    return parser.parse_args()
++
++
++def main() -> None:
++    args = parse_args()
++    args.output_dir.mkdir(parents=True, exist_ok=True)
++    cases = load_manifest(args.manifest)
++    image_urls = prepare_case_inputs(cases)
++    client = LayoutClient(
++        endpoint=args.endpoint,
++        model=args.model,
++        timeout=args.timeout,
++        block_size=args.block_size,
++        dynamic_threshold=args.dynamic_threshold,
++        max_denoising_steps=args.max_denoising_steps,
++    )
++    default_rows = run_variant(
++        cases,
++        image_urls=image_urls,
++        client=client,
++        variant=DEFAULT_VARIANT,
++        output_dir=args.output_dir / DEFAULT_VARIANT.name,
++        layout_concurrency=args.layout_concurrency,
++    )
++    mineru_rows = run_variant(
++        cases,
++        image_urls=image_urls,
++        client=client,
++        variant=MINERU_LAYOUT_VARIANT,
++        output_dir=args.output_dir / MINERU_LAYOUT_VARIANT.name,
++        layout_concurrency=args.layout_concurrency,
++    )
++    pro_rows = read_jsonl(args.pro_results_jsonl) if args.pro_results_jsonl else None
++    write_experiment_report(
++        args.output_dir,
++        default_rows=default_rows,
++        mineru_rows=mineru_rows,
++        pro_rows=pro_rows,
++    )
++    print(
++        json.dumps(
++            {
++                "output_dir": str(args.output_dir),
++                "default": summarize_layout_rows(default_rows),
++                "mineru_layout": summarize_layout_rows(mineru_rows),
++            },
++            indent=2,
++            ensure_ascii=False,
++        )
++    )
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/benchmarks/mineru_diffusion/native_server.py b/benchmarks/mineru_diffusion/native_server.py
+new file mode 100644
+index 00000000..66d1308d
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/native_server.py
+@@ -0,0 +1,244 @@
++from __future__ import annotations
++
++import argparse
++import json
++import time
++from pathlib import Path
++from types import SimpleNamespace
++from typing import Any
++
++import torch
++import uvicorn
++from fastapi import FastAPI, HTTPException
++from pydantic import BaseModel, Field
++from safetensors.torch import load_file
++from transformers import AutoConfig, AutoProcessor, AutoTokenizer
++
++from benchmarks.mineru_diffusion.harness import extract_openai_image_and_prompt
++from vllm.model_executor.models.mineru_diffusion import (
++    MinerUDiffusionForConditionalGeneration,
++)
++
++
++STOP_STRINGS = ("<|endoftext|>", "<|im_end|>")
++SYSTEM_PROMPT = "You are a helpful assistant."
++
++
++class ChatRequest(BaseModel):
++    model: str | None = None
++    messages: list[dict[str, Any]]
++    max_tokens: int = Field(default=1024, ge=1)
++    temperature: float = 1.0
++    block_size: int = Field(default=32, ge=1)
++    dynamic_threshold: float = 0.95
++
++
++def _round_up_to_block(length: int, block_size: int) -> int:
++    return ((length + block_size - 1) // block_size) * block_size
++
++
++class MinerUNativeEngine:
++
++    def __init__(
++        self,
++        model_path: Path,
++        *,
++        device: str,
++        dtype: torch.dtype,
++        max_length: int,
++        remask_strategy: str,
++    ) -> None:
++        self.model_path = model_path
++        self.device = torch.device(device)
++        self.dtype = dtype
++        self.max_length = max_length
++        self.remask_strategy = remask_strategy
++        self.tokenizer = AutoTokenizer.from_pretrained(
++            model_path,
++            trust_remote_code=True,
++            fix_mistral_regex=True,
++        )
++        self.processor = AutoProcessor.from_pretrained(
++            model_path,
++            trust_remote_code=True,
++            use_fast=False,
++        )
++        self.processor.tokenizer = self.tokenizer
++        self.processor.chat_template = self.tokenizer.chat_template
++        hf_config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
++        vllm_config = SimpleNamespace(
++            model_config=SimpleNamespace(
++                hf_config=hf_config,
++                hf_text_config=hf_config.text_config,
++                dtype=dtype,
++            )
++        )
++        self.model = MinerUDiffusionForConditionalGeneration(
++            vllm_config=vllm_config,
++        ).eval()
++        self._load_weights()
++        self.model.to(device=self.device, dtype=dtype)
++        self.mask_token_id = self.tokenizer.convert_tokens_to_ids("<|MASK|>")
++
++    def _load_weights(self) -> None:
++        index_path = self.model_path / "model.safetensors.index.json"
++        index = json.loads(index_path.read_text(encoding="utf-8"))
++        weight_map: dict[str, str] = index["weight_map"]
++        model_state = self.model.state_dict()
++        loaded: set[str] = set()
++
++        for shard_name in sorted(set(weight_map.values())):
++            shard = load_file(str(self.model_path / shard_name), device="cpu")
++            for name, tensor in shard.items():
++                target = model_state.get(name)
++                if target is None:
++                    continue
++                target.copy_(tensor.to(dtype=target.dtype))
++                loaded.add(name)
++
++        missing = sorted(set(model_state) - loaded)
++        if missing:
++            raise RuntimeError(f"missing native weights: {missing[:8]}")
++
++    def _trim_response(self, text: str) -> str:
++        for stop in STOP_STRINGS:
++            text = text.split(stop, 1)[0]
++        return text.strip()
++
++    @torch.no_grad()
++    def generate(
++        self,
++        *,
++        image: str | None,
++        prompt: str,
++        max_tokens: int,
++        block_size: int,
++        temperature: float,
++        dynamic_threshold: float,
++    ) -> str:
++        if image is None:
++            raise ValueError("MinerU-Diffusion requests must include an image")
++
++        messages = [
++            {"role": "system", "content": [{"type": "text", "text": SYSTEM_PROMPT}]},
++            {
++                "role": "user",
++                "content": [
++                    {"type": "image", "image": image},
++                    {"type": "text", "text": prompt},
++                ],
++            },
++        ]
++        prompt_text = self.processor.apply_chat_template(
++            messages,
++            add_generation_prompt=True,
++        )
++        inputs = self.processor(
++            images=[image],
++            text=prompt_text,
++            truncation=True,
++            max_length=self.max_length,
++            return_tensors="pt",
++        )
++        input_ids = inputs["input_ids"].to(torch.long).to(self.device)
++        image_grid_thw = inputs.get("image_grid_thw")
++        if image_grid_thw is not None:
++            image_grid_thw = image_grid_thw.to(torch.long).to(self.device)
++        pixel_values = inputs["pixel_values"].to(self.dtype).to(self.device)
++
++        gen_length = _round_up_to_block(max_tokens, block_size)
++        response_ids, _, _ = self.model.generate(
++            pixel_values=pixel_values,
++            image_grid_thw=image_grid_thw,
++            input_ids=input_ids,
++            mask_token_id=self.mask_token_id,
++            denoising_steps=block_size,
++            gen_length=gen_length,
++            block_length=block_size,
++            temperature=temperature,
++            remasking_strategy=self.remask_strategy,
++            dynamic_threshold=dynamic_threshold,
++            tokenizer=self.tokenizer,
++            stopping_criteria=list(STOP_STRINGS),
++        )
++        return self._trim_response(
++            self.tokenizer.decode(response_ids[0], skip_special_tokens=False)
++        )
++
++
++def create_app(engine: MinerUNativeEngine) -> FastAPI:
++    app = FastAPI(title="MinerU-Diffusion native compatibility server")
++
++    @app.get("/health")
++    def health() -> dict[str, str]:
++        return {"status": "ok"}
++
++    @app.post("/v1/chat/completions")
++    def chat_completions(request: ChatRequest) -> dict[str, Any]:
++        started = time.perf_counter()
++        try:
++            image, prompt = extract_openai_image_and_prompt(request.model_dump())
++            output = engine.generate(
++                image=image,
++                prompt=prompt,
++                max_tokens=request.max_tokens,
++                block_size=request.block_size,
++                temperature=request.temperature,
++                dynamic_threshold=request.dynamic_threshold,
++            )
++        except Exception as exc:
++            raise HTTPException(status_code=500, detail=str(exc)) from exc
++
++        return {
++            "id": f"mineru-native-{int(started * 1000)}",
++            "object": "chat.completion",
++            "created": int(time.time()),
++            "model": request.model or "mineru-diffusion-native",
++            "choices": [
++                {
++                    "index": 0,
++                    "message": {"role": "assistant", "content": output},
++                    "finish_reason": "stop",
++                }
++            ],
++            "usage": {
++                "prompt_tokens": None,
++                "completion_tokens": None,
++                "total_tokens": None,
++            },
++            "mineru_metrics": {"latency_s": time.perf_counter() - started},
++        }
++
++    return app
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--model-path", required=True)
++    parser.add_argument("--host", default="127.0.0.1")
++    parser.add_argument("--port", type=int, default=18083)
++    parser.add_argument("--device", default="cuda:0")
++    parser.add_argument(
++        "--dtype",
++        choices=["bfloat16", "float16", "float32"],
++        default="bfloat16",
++    )
++    parser.add_argument("--max-length", type=int, default=4096)
++    parser.add_argument("--remask-strategy", default="low_confidence_dynamic")
++    return parser.parse_args()
++
++
++def main() -> None:
++    args = parse_args()
++    engine = MinerUNativeEngine(
++        Path(args.model_path).expanduser().resolve(),
++        device=args.device,
++        dtype=getattr(torch, args.dtype),
++        max_length=args.max_length,
++        remask_strategy=args.remask_strategy,
++    )
++    uvicorn.run(create_app(engine), host=args.host, port=args.port)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/benchmarks/mineru_diffusion/run_native_benchmark.py b/benchmarks/mineru_diffusion/run_native_benchmark.py
+new file mode 100644
+index 00000000..bb7b1dd3
+--- /dev/null
++++ b/benchmarks/mineru_diffusion/run_native_benchmark.py
+@@ -0,0 +1,188 @@
++from __future__ import annotations
++
++import argparse
++import os
++import subprocess
++import sys
++import time
++from pathlib import Path
++
++import requests
++
++
++def wait_for_health(url: str, timeout_s: float) -> None:
++    deadline = time.monotonic() + timeout_s
++    session = requests.Session()
++    session.trust_env = False
++    last_error: Exception | None = None
++    while time.monotonic() < deadline:
++        try:
++            response = session.get(url, timeout=2)
++            response.raise_for_status()
++            return
++        except Exception as exc:
++            last_error = exc
++            time.sleep(1)
++    raise TimeoutError(f"server did not become healthy: {last_error}")
++
++
++def parse_args() -> argparse.Namespace:
++    parser = argparse.ArgumentParser()
++    parser.add_argument(
++        "--model-path",
++        required=True,
++        help="local path or Hugging Face cache path for MinerU-Diffusion weights",
++    )
++    parser.add_argument(
++        "--image",
++        required=True,
++        help="image URL passed to the OpenAI-compatible benchmark client",
++    )
++    parser.add_argument("--host", default="127.0.0.1")
++    parser.add_argument("--port", type=int, default=18083)
++    parser.add_argument("--device", default="cuda:0")
++    parser.add_argument("--dtype", default="bfloat16")
++    parser.add_argument("--cuda-visible-devices", default=None)
++    parser.add_argument(
++        "--output-dir",
++        type=Path,
++        default=Path("benchmark_results/mineru_diffusion/native_direct"),
++    )
++    parser.add_argument("--timeout", type=float, default=600.0)
++    parser.add_argument("--startup-timeout", type=float, default=360.0)
++    parser.add_argument("--server-log", type=Path, default=None)
++    parser.add_argument(
++        "--task-max-tokens",
++        default="",
++        help="comma-separated task=tokens overrides for generated default cases",
++    )
++    parser.add_argument(
++        "--baseline-results",
++        type=Path,
++        default=None,
++        help="optional baseline results JSONL for post-benchmark quality gate",
++    )
++    parser.add_argument("--compare-output", type=Path, default=None)
++    parser.add_argument("--similarity-cases", default="")
++    parser.add_argument("--min-similarity", type=float, default=None)
++    parser.add_argument("--max-control-repeat", type=int, default=None)
++    parser.add_argument("--max-control-token-ratio", type=float, default=None)
++    return parser.parse_args()
++
++
++def latest_results_file(output_dir: Path) -> Path:
++    latest = output_dir / "latest_results.jsonl"
++    if latest.exists():
++        return latest
++
++    def sort_key(path: Path) -> tuple[int, float, str]:
++        suffix = path.stem.removeprefix("results_")
++        try:
++            sequence = int(suffix)
++        except ValueError:
++            sequence = -1
++        return sequence, path.stat().st_mtime, path.name
++
++    results = sorted(output_dir.glob("results_*.jsonl"), key=sort_key)
++    if not results:
++        raise FileNotFoundError(f"no benchmark results found under {output_dir}")
++    return results[-1]
++
++
++def run_benchmark(args: argparse.Namespace) -> None:
++    endpoint = f"http://{args.host}:{args.port}/v1/chat/completions"
++    health_url = f"http://{args.host}:{args.port}/health"
++    server_log = args.server_log
++    if server_log is None:
++        server_log = args.output_dir / "native_server.log"
++    server_log.parent.mkdir(parents=True, exist_ok=True)
++    args.output_dir.mkdir(parents=True, exist_ok=True)
++
++    server_cmd = [
++        sys.executable,
++        "-m",
++        "benchmarks.mineru_diffusion.native_server",
++        "--model-path",
++        args.model_path,
++        "--host",
++        args.host,
++        "--port",
++        str(args.port),
++        "--device",
++        args.device,
++        "--dtype",
++        args.dtype,
++    ]
++    bench_cmd = [
++        sys.executable,
++        "-m",
++        "benchmarks.mineru_diffusion.bench_hf_server",
++        "--endpoint",
++        endpoint,
++        "--image",
++        args.image,
++        "--output-dir",
++        str(args.output_dir),
++        "--timeout",
++        str(args.timeout),
++    ]
++    if args.task_max_tokens:
++        bench_cmd.extend(["--task-max-tokens", args.task_max_tokens])
++
++    env = None
++    if args.cuda_visible_devices is not None:
++        env = dict(os.environ)
++        env["CUDA_VISIBLE_DEVICES"] = args.cuda_visible_devices
++
++    with server_log.open("w", encoding="utf-8") as log_file:
++        server = subprocess.Popen(
++            server_cmd,
++            stdout=log_file,
++            stderr=subprocess.STDOUT,
++            env=env,
++        )
++        try:
++            wait_for_health(health_url, args.startup_timeout)
++            subprocess.run(bench_cmd, check=True, env=env)
++            if args.baseline_results is not None:
++                compare_cmd = [
++                    sys.executable,
++                    "-m",
++                    "benchmarks.mineru_diffusion.compare_results",
++                    "--baseline",
++                    str(args.baseline_results),
++                    "--candidate",
++                    str(latest_results_file(args.output_dir)),
++                ]
++                if args.compare_output is not None:
++                    compare_cmd.extend(["--output", str(args.compare_output)])
++                if args.similarity_cases:
++                    compare_cmd.extend(["--similarity-cases", args.similarity_cases])
++                if args.min_similarity is not None:
++                    compare_cmd.extend(["--min-similarity", str(args.min_similarity)])
++                if args.max_control_repeat is not None:
++                    compare_cmd.extend([
++                        "--max-control-repeat",
++                        str(args.max_control_repeat),
++                    ])
++                if args.max_control_token_ratio is not None:
++                    compare_cmd.extend([
++                        "--max-control-token-ratio",
++                        str(args.max_control_token_ratio),
++                    ])
++                subprocess.run(compare_cmd, check=True, env=env)
++        finally:
++            server.terminate()
++            try:
++                server.wait(timeout=30)
++            except subprocess.TimeoutExpired:
++                server.kill()
++                server.wait(timeout=30)
++
++
++def main() -> None:
++    run_benchmark(parse_args())
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/tests/benchmarks/test_mineru_diffusion_end2end_openai.py b/tests/benchmarks/test_mineru_diffusion_end2end_openai.py
+new file mode 100644
+index 00000000..08573f36
+--- /dev/null
++++ b/tests/benchmarks/test_mineru_diffusion_end2end_openai.py
+@@ -0,0 +1,238 @@
++import json
++import threading
++from pathlib import Path
++
++from PIL import Image
++
++from benchmarks.mineru_diffusion.end2end_openai import (
++    End2EndConfig,
++    End2EndOpenAIClient,
++    crop_block_image,
++    parse_layout_output,
++    run_end2end_batch,
++    run_end2end,
++)
++
++
++def test_parse_layout_output_normalizes_boxes_and_angles():
++    blocks = parse_layout_output(
++        "<|box_start|>900 800 100 200<|box_end|>"
++        "<|ref_start|>table<|ref_end|><|rotate_right|>\n"
++        "<|box_start|>000 000 000 010<|box_end|>"
++        "<|ref_start|>text<|ref_end|><|rotate_up|>"
++    )
++
++    assert len(blocks) == 1
++    assert blocks[0].type == "table"
++    assert blocks[0].bbox == [0.1, 0.2, 0.9, 0.8]
++    assert blocks[0].angle == 90
++
++
++def test_crop_block_image_uses_normalized_layout_coordinates():
++    image = Image.new("RGB", (200, 100), "white")
++    block = parse_layout_output(
++        "<|box_start|>250 250 750 750<|box_end|>"
++        "<|ref_start|>text<|ref_end|><|rotate_up|>"
++    )[0]
++
++    cropped = crop_block_image(image, block)
++
++    assert cropped.size == (100, 50)
++
++
++def test_run_end2end_calls_layout_then_matching_block_prompts(tmp_path: Path):
++    image_path = tmp_path / "page.png"
++    Image.new("RGB", (100, 100), "white").save(image_path)
++    calls = []
++
++    class FakeClient:
++        def infer(self, image_path, prompt, max_tokens):
++            calls.append((Path(image_path).name, prompt, max_tokens))
++            if prompt == "\nLayout Detection:":
++                return (
++                    "<|box_start|>000 000 500 500<|box_end|>"
++                    "<|ref_start|>text<|ref_end|><|rotate_up|>\n"
++                    "<|box_start|>500 000 1000 500<|box_end|>"
++                    "<|ref_start|>table<|ref_end|><|rotate_up|>"
++                )
++            if prompt == "\nTable Recognition:":
++                return "<fcel>A<nl>"
++            return "plain text"
++
++    result = run_end2end(
++        End2EndConfig(
++            image_path=image_path,
++            output_dir=tmp_path / "out",
++            endpoint="http://unused/v1/chat/completions",
++            layout_max_tokens=64,
++            content_max_tokens=128,
++            table_max_tokens=256,
++            formula_max_tokens=512,
++        ),
++        client=FakeClient(),
++    )
++
++    assert [call[1:] for call in calls] == [
++        ("\nLayout Detection:", 64),
++        ("\nText Recognition:", 128),
++        ("\nTable Recognition:", 256),
++    ]
++    assert result.metrics["num_blocks"] == 2
++    assert result.metrics["num_extracted_blocks"] == 2
++    assert [block.type for block in result.blocks] == ["text", "table"]
++    assert result.blocks[0].content == "plain text"
++    assert result.blocks[1].content == "<table><tr><td>A</td></tr></table>"
++    assert "plain text" in result.markdown
++    assert "<table>" in result.markdown
++
++    latest = json.loads((tmp_path / "out" / "latest_result.json").read_text())
++    assert latest["metrics"]["num_blocks"] == 2
++    assert latest["blocks"][1]["type"] == "table"
++
++
++def test_run_end2end_can_extract_blocks_concurrently(tmp_path: Path):
++    image_path = tmp_path / "page.png"
++    Image.new("RGB", (100, 100), "white").save(image_path)
++    first_content_started = threading.Event()
++    second_content_started = threading.Event()
++    release_content = threading.Event()
++    content_prompts = []
++    content_lock = threading.Lock()
++
++    class FakeClient:
++        def infer(self, image_path, prompt, max_tokens):
++            if prompt == "\nLayout Detection:":
++                return (
++                    "<|box_start|>000 000 500 500<|box_end|>"
++                    "<|ref_start|>text<|ref_end|><|rotate_up|>\n"
++                    "<|box_start|>500 000 1000 500<|box_end|>"
++                    "<|ref_start|>text<|ref_end|><|rotate_up|>"
++                )
++            with content_lock:
++                content_prompts.append(prompt)
++                call_index = len(content_prompts)
++            if call_index == 1:
++                first_content_started.set()
++                assert second_content_started.wait(timeout=1)
++                release_content.wait(timeout=1)
++                return "first"
++            second_content_started.set()
++            assert first_content_started.is_set()
++            release_content.set()
++            return "second"
++
++    result = run_end2end(
++        End2EndConfig(
++            image_path=image_path,
++            output_dir=tmp_path / "out",
++            endpoint="http://unused/v1/chat/completions",
++            content_concurrency=2,
++        ),
++        client=FakeClient(),
++    )
++
++    assert sorted(block.content for block in result.blocks) == ["first", "second"]
++    assert result.metrics["content_concurrency"] == 2
++
++
++def test_run_end2end_batch_flattens_extract_requests_across_pages(tmp_path: Path):
++    image_paths = []
++    for index in range(2):
++        image_path = tmp_path / f"page_{index}.png"
++        Image.new("RGB", (100, 100), "white").save(image_path)
++        image_paths.append(image_path)
++
++    layout_calls = []
++    content_calls = []
++
++    class FakeClient:
++        def infer(self, image_path, prompt, max_tokens):
++            if prompt == "\nLayout Detection:":
++                layout_calls.append(Path(image_path))
++                return (
++                    "<|box_start|>000 000 500 500<|box_end|>"
++                    "<|ref_start|>text<|ref_end|><|rotate_up|>"
++                )
++            assert len(layout_calls) == 2
++            content_calls.append(Path(image_path))
++            return f"content-{Path(image_path).parent.parent.stem}"
++
++    configs = [
++        End2EndConfig(
++            image_path=image_path,
++            output_dir=tmp_path / "out" / image_path.stem,
++            endpoint="http://unused/v1/chat/completions",
++            content_concurrency=2,
++        )
++        for image_path in image_paths
++    ]
++
++    results = run_end2end_batch(
++        configs,
++        client=FakeClient(),
++        layout_concurrency=2,
++        content_concurrency=2,
++    )
++
++    assert len(results) == 2
++    assert len(layout_calls) == 2
++    assert len(content_calls) == 2
++    assert all(result.metrics["throughput_batch_size"] == 2 for result in results)
++    assert all(result.metrics["layout_concurrency"] == 2 for result in results)
++    assert all(result.metrics["content_concurrency"] == 2 for result in results)
++    assert [result.blocks[0].content for result in results] == [
++        "content-page_0",
++        "content-page_1",
++    ]
++
++
++def test_openai_client_builds_mineru_request_payload(monkeypatch, tmp_path: Path):
++    image_path = tmp_path / "crop.png"
++    image_path.write_bytes(b"png")
++    captured = {}
++
++    class FakeResponse:
++        def raise_for_status(self):
++            return None
++
++        def json(self):
++            return {"choices": [{"message": {"content": "ok"}}]}
++
++    class FakeSession:
++        trust_env = True
++
++        def post(self, endpoint, json, timeout):
++            captured["endpoint"] = endpoint
++            captured["json"] = json
++            captured["timeout"] = timeout
++            captured["trust_env"] = self.trust_env
++            return FakeResponse()
++
++    monkeypatch.setattr(
++        "benchmarks.mineru_diffusion.end2end_openai.requests.Session",
++        FakeSession,
++    )
++
++    client = End2EndOpenAIClient(
++        endpoint="http://host/v1/chat/completions",
++        model="mineru-diffusion",
++        timeout=12,
++        block_size=32,
++        dynamic_threshold=0.95,
++        max_denoising_steps=16,
++    )
++
++    assert client.infer(image_path, "\nText Recognition:", 128) == "ok"
++    assert captured["endpoint"] == "http://host/v1/chat/completions"
++    assert captured["timeout"] == 12
++    assert captured["trust_env"] is False
++    assert captured["json"]["max_tokens"] == 128
++    assert captured["json"]["max_denoising_steps"] == 16
++    assert captured["json"]["vllm_xargs"] == {
++        "block_size": 32,
++        "dynamic_threshold": 0.95,
++        "max_denoising_steps": 16,
++    }
++    assert captured["json"]["messages"][1]["content"][0]["image_url"]["url"] == (
++        f"file://{image_path}"
++    )
+diff --git a/tests/benchmarks/test_mineru_diffusion_end2end_suite.py b/tests/benchmarks/test_mineru_diffusion_end2end_suite.py
+new file mode 100644
+index 00000000..bd4e7616
+--- /dev/null
++++ b/tests/benchmarks/test_mineru_diffusion_end2end_suite.py
+@@ -0,0 +1,229 @@
++import json
++from pathlib import Path
++
++from PIL import Image, JpegImagePlugin
++
++from benchmarks.mineru_diffusion.compare_results import parse_layout_blocks
++from benchmarks.mineru_diffusion.end2end_suite import (
++    PageCase,
++    PdfSource,
++    blocks_to_layout_text,
++    blocks_to_markdown,
++    compare_suite_rows,
++    parse_page_spec,
++    render_pdf_sources,
++    run_dllm_throughput_suite,
++    summarize_suite_rows,
++)
++
++
++def test_parse_page_spec_supports_ranges_and_shortcuts():
++    assert parse_page_spec("0,2-4,last", page_count=6) == [0, 2, 3, 4, 5]
++    assert parse_page_spec("first:3,last:2", page_count=6) == [0, 1, 2, 4, 5]
++    assert parse_page_spec("all", page_count=3) == [0, 1, 2]
++
++
++def test_render_pdf_sources_writes_images_and_manifest(tmp_path: Path):
++    assert JpegImagePlugin is not None
++    pdf_path = tmp_path / "sample.pdf"
++    first = Image.new("RGB", (80, 100), "white")
++    second = Image.new("RGB", (90, 110), "white")
++    first.save(pdf_path, save_all=True, append_images=[second])
++
++    cases = render_pdf_sources(
++        [PdfSource(doc_id="sample", pdf_path=pdf_path, pages="0,last")],
++        output_dir=tmp_path / "rendered",
++        scale=1.0,
++    )
++
++    assert [case.case_id for case in cases] == ["sample_p0001", "sample_p0002"]
++    assert all(case.image_path.exists() for case in cases)
++    manifest = json.loads((tmp_path / "rendered" / "manifest.json").read_text())
++    assert [row["page_index"] for row in manifest["cases"]] == [0, 1]
++
++
++def test_blocks_to_markdown_and_layout_text_normalize_suite_payload():
++    blocks = [
++        {
++            "type": "title",
++            "bbox": [0.1, 0.2, 0.3, 0.4],
++            "angle": 0,
++            "content": "Title",
++        },
++        {
++            "type": "table",
++            "bbox": [0.4, 0.5, 0.8, 0.9],
++            "angle": 90,
++            "content": "<fcel>A<nl>",
++        },
++    ]
++
++    markdown = blocks_to_markdown(blocks)
++    layout_text = blocks_to_layout_text(blocks)
++
++    assert "Title" in markdown
++    assert "<table>" in markdown
++    parsed = parse_layout_blocks(layout_text)
++    assert [(block.label, block.bbox) for block in parsed] == [
++        ("title", (100.0, 200.0, 300.0, 400.0)),
++        ("table", (400.0, 500.0, 800.0, 900.0)),
++    ]
++    assert "<|rotate_right|>" in layout_text
++
++
++def test_compare_suite_rows_aggregates_latency_and_quality():
++    baseline_rows = [
++        {
++            "case_id": "doc_p0001",
++            "ok": True,
++            "metrics": {"total_elapsed": 2.0},
++            "markdown": "same text",
++            "layout_output": (
++                "<|box_start|>000 000 500 500<|box_end|>"
++                "<|ref_start|>text<|ref_end|><|rotate_up|>"
++            ),
++            "block_type_counts": {"text": 1},
++        }
++    ]
++    candidate_rows = [
++        {
++            "case_id": "doc_p0001",
++            "ok": True,
++            "metrics": {"total_elapsed": 1.0},
++            "markdown": "same text",
++            "layout_output": (
++                "<|box_start|>010 010 490 490<|box_end|>"
++                "<|ref_start|>text<|ref_end|><|rotate_up|>"
++            ),
++            "block_type_counts": {"text": 1},
++        }
++    ]
++
++    payload = compare_suite_rows(baseline_rows, candidate_rows)
++
++    assert payload["summary"]["num_cases"] == 1
++    assert payload["summary"]["total_speedup"] == 2.0
++    assert payload["summary"]["mean_markdown_similarity"] == 1.0
++    assert payload["summary"]["mean_layout_f1"] == 1.0
++    assert payload["cases"][0]["layout_f1"] == 1.0
++
++
++def test_summarize_suite_rows_carries_common_content_concurrency():
++    rows = [
++        {
++            "ok": True,
++            "metrics": {
++                "total_elapsed": 2.0,
++                "content_concurrency": 4,
++            },
++            "markdown": "abcd",
++            "block_type_counts": {"text": 1},
++        },
++        {
++            "ok": True,
++            "metrics": {
++                "total_elapsed": 3.0,
++                "content_concurrency": 4,
++            },
++            "markdown": "ef",
++            "block_type_counts": {"table": 1},
++        },
++    ]
++
++    summary = summarize_suite_rows(rows)
++
++    assert summary["content_concurrency"] == 4
++
++
++def test_summarize_suite_rows_reports_throughput_wall_clock():
++    rows = [
++        {
++            "ok": True,
++            "metrics": {
++                "throughput_wall_elapsed_s": 5.0,
++                "throughput_layout_wall_elapsed_s": 2.0,
++                "throughput_extract_wall_elapsed_s": 3.0,
++                "layout_concurrency": 2,
++                "content_concurrency": 4,
++            },
++            "markdown": "abcd",
++            "block_type_counts": {"text": 1},
++        },
++        {
++            "ok": True,
++            "metrics": {
++                "throughput_wall_elapsed_s": 5.0,
++                "throughput_layout_wall_elapsed_s": 2.0,
++                "throughput_extract_wall_elapsed_s": 3.0,
++                "layout_concurrency": 2,
++                "content_concurrency": 4,
++            },
++            "markdown": "ef",
++            "block_type_counts": {"table": 1},
++        },
++    ]
++
++    summary = summarize_suite_rows(rows)
++
++    assert summary["throughput_wall_elapsed_s"] == 5.0
++    assert summary["throughput_layout_wall_elapsed_s"] == 2.0
++    assert summary["throughput_extract_wall_elapsed_s"] == 3.0
++    assert summary["throughput_pages_per_s"] == 0.4
++    assert summary["throughput_markdown_chars_per_s"] == 1.2
++    assert summary["layout_concurrency"] == 2
++    assert summary["content_concurrency"] == 4
++
++
++def test_run_dllm_throughput_suite_returns_compare_compatible_rows(tmp_path: Path):
++    image_paths = []
++    cases = []
++    for index in range(2):
++        image_path = tmp_path / f"page_{index}.png"
++        Image.new("RGB", (100, 100), "white").save(image_path)
++        image_paths.append(image_path)
++        cases.append(
++            PageCase(
++                case_id=f"doc_p{index + 1:04d}",
++                doc_id="doc",
++                pdf_path=tmp_path / "doc.pdf",
++                page_index=index,
++                image_path=image_path,
++                width=100,
++                height=100,
++            )
++        )
++
++    class FakeClient:
++        def infer(self, image_path, prompt, max_tokens):
++            if prompt == "\nLayout Detection:":
++                return (
++                    "<|box_start|>000 000 500 500<|box_end|>"
++                    "<|ref_start|>text<|ref_end|><|rotate_up|>"
++                )
++            return "content"
++
++    rows = run_dllm_throughput_suite(
++        cases,
++        output_dir=tmp_path / "out",
++        endpoint="http://unused/v1/chat/completions",
++        model="mineru-diffusion",
++        timeout=10,
++        layout_max_tokens=64,
++        content_max_tokens=64,
++        table_max_tokens=64,
++        formula_max_tokens=64,
++        block_size=32,
++        dynamic_threshold=0.9,
++        layout_concurrency=2,
++        content_concurrency=2,
++        client=FakeClient(),
++    )
++
++    summary = summarize_suite_rows(rows)
++
++    assert [row["case_id"] for row in rows] == ["doc_p0001", "doc_p0002"]
++    assert all(row["ok"] for row in rows)
++    assert all(row["markdown"] == "content" for row in rows)
++    assert summary["throughput_wall_elapsed_s"] > 0
++    assert summary["layout_concurrency"] == 2
++    assert summary["content_concurrency"] == 2
+diff --git a/tests/benchmarks/test_mineru_diffusion_harness.py b/tests/benchmarks/test_mineru_diffusion_harness.py
+new file mode 100644
+index 00000000..2e704aa9
+--- /dev/null
++++ b/tests/benchmarks/test_mineru_diffusion_harness.py
+@@ -0,0 +1,452 @@
++import json
++import subprocess
++from argparse import Namespace
++from pathlib import Path
++
++from benchmarks.mineru_diffusion.harness import (
++    BenchmarkCase,
++    BenchmarkResult,
++    TASK_PROMPTS,
++    extract_openai_image_and_prompt,
++    summarize_results,
++    write_default_cases,
++)
++from benchmarks.mineru_diffusion.bench_hf_server import create_session
++from benchmarks.mineru_diffusion.bench_hf_server import build_request_payload
++from benchmarks.mineru_diffusion.bench_hf_server import parse_task_max_tokens
++from benchmarks.mineru_diffusion.compare_results import (
++    QualityGateError,
++    QualityThresholds,
++    assert_quality_thresholds,
++    compare_case,
++    compare_results,
++    control_token_ratio,
++    max_consecutive_control_repeat,
++    summarize_comparisons,
++)
++from benchmarks.mineru_diffusion.run_native_benchmark import run_benchmark
++
++
++def test_extract_openai_image_and_prompt_from_multimodal_message():
++    payload = {
++        "messages": [
++            {"role": "system", "content": "ignored"},
++            {
++                "role": "user",
++                "content": [
++                    {"type": "image_url", "image_url": {"url": "/tmp/page.png"}},
++                    {"type": "text", "text": "\nText Recognition:"},
++                ],
++            },
++        ]
++    }
++
++    image, prompt = extract_openai_image_and_prompt(payload)
++
++    assert image == "/tmp/page.png"
++    assert prompt == "\nText Recognition:"
++
++
++def test_extract_openai_image_and_prompt_accepts_plain_string_prompt():
++    payload = {"messages": [{"role": "user", "content": "hello"}]}
++
++    image, prompt = extract_openai_image_and_prompt(payload)
++
++    assert image is None
++    assert prompt == "hello"
++
++
++def test_summarize_results_reports_latency_throughput_and_failures():
++    results = [
++        BenchmarkResult(
++            case_id="a",
++            ok=True,
++            latency_s=2.0,
++            output_text="abcd",
++            error=None,
++        ),
++        BenchmarkResult(
++            case_id="b",
++            ok=True,
++            latency_s=1.0,
++            output_text="abcdef",
++            error=None,
++        ),
++        BenchmarkResult(
++            case_id="c",
++            ok=False,
++            latency_s=0.5,
++            output_text="",
++            error="boom",
++        ),
++    ]
++
++    summary = summarize_results(results)
++
++    assert summary["num_requests"] == 3
++    assert summary["num_ok"] == 2
++    assert summary["num_failed"] == 1
++    assert summary["mean_latency_s"] == 1.5
++    assert summary["output_chars_per_s"] == 10 / 3.0
++
++
++def test_benchmark_case_jsonl_roundtrip(tmp_path: Path):
++    path = tmp_path / "cases.jsonl"
++    case = BenchmarkCase(
++        case_id="sample",
++        image="/data/page.png",
++        prompt="\nLayout Detection:",
++    )
++    path.write_text(json.dumps(case.to_payload()) + "\n", encoding="utf-8")
++
++    payload = json.loads(path.read_text(encoding="utf-8"))
++
++    assert payload["case_id"] == "sample"
++    assert payload["messages"][0]["role"] == "user"
++    assert payload["messages"][0]["content"][0]["type"] == "image_url"
++
++
++def test_default_layout_prompt_matches_openai_layout_baseline():
++    assert TASK_PROMPTS["layout"] == "\nLayout Analysis:"
++
++
++def test_write_default_cases_accepts_task_max_tokens(tmp_path: Path):
++    path = tmp_path / "cases.jsonl"
++
++    write_default_cases(
++        path,
++        "/data/page.png",
++        task_max_tokens={"text": 128, "layout": 64},
++    )
++
++    rows = [
++        json.loads(line)
++        for line in path.read_text(encoding="utf-8").splitlines()
++    ]
++    by_id = {row["case_id"]: row for row in rows}
++
++    assert by_id["text"]["max_tokens"] == 128
++    assert by_id["layout"]["max_tokens"] == 64
++    assert "max_tokens" not in by_id["table"]
++
++
++def test_parse_task_max_tokens_accepts_comma_separated_pairs():
++    assert parse_task_max_tokens("text=512,layout=128") == {
++        "text": 512,
++        "layout": 128,
++    }
++
++
++def test_benchmark_client_ignores_environment_proxies():
++    assert create_session().trust_env is False
++
++
++def test_benchmark_payload_passes_mineru_args_through_vllm_xargs():
++    payload = build_request_payload(
++        {
++            "case_id": "text",
++            "model": "mineru-diffusion",
++            "messages": [{"role": "user", "content": "hello"}],
++            "max_tokens": 128,
++            "temperature": 0.0,
++            "block_size": 16,
++            "dynamic_threshold": 0.73,
++            "max_denoising_steps": 8,
++        }
++    )
++
++    assert payload["block_size"] == 16
++    assert payload["dynamic_threshold"] == 0.73
++    assert payload["max_denoising_steps"] == 8
++    assert payload["vllm_xargs"] == {
++        "block_size": 16,
++        "dynamic_threshold": 0.73,
++        "max_denoising_steps": 8,
++    }
++
++
++def test_benchmark_payload_sets_mineru_stop_strings_by_default():
++    payload = build_request_payload(
++        {
++            "case_id": "text",
++            "messages": [{"role": "user", "content": "hello"}],
++        }
++    )
++
++    assert payload["stop"] == ["<|endoftext|>", "<|im_end|>"]
++
++
++def test_run_native_benchmark_starts_client_and_stops_server(
++    monkeypatch, tmp_path: Path
++):
++    events = []
++
++    class FakeServer:
++        def terminate(self):
++            events.append("terminate")
++
++        def wait(self, timeout):
++            events.append(("wait", timeout))
++
++    def fake_popen(cmd, stdout, stderr, env):
++        events.append(("popen", cmd, env))
++        assert stdout.writable()
++        assert stderr == subprocess.STDOUT
++        return FakeServer()
++
++    def fake_wait_for_health(url, timeout_s):
++        events.append(("health", url, timeout_s))
++
++    def fake_run(cmd, check, env):
++        events.append(("run", cmd, check, env))
++        if "benchmarks.mineru_diffusion.bench_hf_server" in cmd:
++            args.output_dir.mkdir(parents=True, exist_ok=True)
++            (args.output_dir / "results_2.jsonl").write_text("", encoding="utf-8")
++            (args.output_dir / "results_1.jsonl").write_text("", encoding="utf-8")
++
++    monkeypatch.setattr(
++        "benchmarks.mineru_diffusion.run_native_benchmark.subprocess.Popen",
++        fake_popen,
++    )
++    monkeypatch.setattr(
++        "benchmarks.mineru_diffusion.run_native_benchmark.wait_for_health",
++        fake_wait_for_health,
++    )
++    monkeypatch.setattr(
++        "benchmarks.mineru_diffusion.run_native_benchmark.subprocess.run",
++        fake_run,
++    )
++
++    args = Namespace(
++        model_path="/model",
++        image="file:///page.png",
++        host="127.0.0.1",
++        port=18083,
++        device="cuda:0",
++        dtype="bfloat16",
++        cuda_visible_devices="1",
++        output_dir=tmp_path / "out",
++        timeout=123.0,
++        startup_timeout=45.0,
++        server_log=None,
++        task_max_tokens="text=128,layout=64",
++        baseline_results=tmp_path / "baseline.jsonl",
++        min_similarity=0.95,
++        similarity_cases="text,table",
++        max_control_repeat=8,
++        max_control_token_ratio=None,
++        compare_output=None,
++    )
++
++    run_benchmark(args)
++
++    assert events[0][0] == "popen"
++    assert events[0][2]["CUDA_VISIBLE_DEVICES"] == "1"
++    assert events[1] == ("health", "http://127.0.0.1:18083/health", 45.0)
++    assert events[2][0] == "run"
++    assert events[2][1][1:] == [
++        "-m",
++        "benchmarks.mineru_diffusion.bench_hf_server",
++        "--endpoint",
++        "http://127.0.0.1:18083/v1/chat/completions",
++        "--image",
++        "file:///page.png",
++        "--output-dir",
++        str(tmp_path / "out"),
++        "--timeout",
++        "123.0",
++        "--task-max-tokens",
++        "text=128,layout=64",
++    ]
++    assert events[3][0] == "run"
++    assert events[3][1][1:] == [
++        "-m",
++        "benchmarks.mineru_diffusion.compare_results",
++        "--baseline",
++        str(tmp_path / "baseline.jsonl"),
++        "--candidate",
++        str(tmp_path / "out" / "results_2.jsonl"),
++        "--similarity-cases",
++        "text,table",
++        "--min-similarity",
++        "0.95",
++        "--max-control-repeat",
++        "8",
++    ]
++    assert events[-2:] == ["terminate", ("wait", 30)]
++
++
++def test_compare_results_reports_similarity_and_control_repeats():
++    baseline = {
++        "case_id": "table",
++        "ok": True,
++        "output_text": "<fcel>Abstract<nl>\n<fcel>Optimizing complex systems",
++    }
++    candidate = {
++        "case_id": "table",
++        "ok": True,
++        "output_text": "<fcel>Abstract<nl>\n<fcel>Optimizing complex systems",
++    }
++
++    comparison = compare_case("table", baseline, candidate)
++
++    assert comparison.baseline_ok is True
++    assert comparison.candidate_ok is True
++    assert comparison.similarity == 1.0
++    assert comparison.char_ratio == 1.0
++    assert comparison.candidate_max_control_repeat == 1
++
++
++def test_compare_results_reports_layout_box_f1_for_layout_cases():
++    baseline = {
++        "case_id": "layout",
++        "ok": True,
++        "output_text": (
++            "<|box_start|>000 000 028 031<|box_end|>"
++            "<|ref_start|>title<|ref_end|><|rotate_up|>\n"
++            "<|box_start|>000 086 999 999<|box_end|>"
++            "<|ref_start|>table<|ref_end|><|rotate_up|>"
++        ),
++    }
++    candidate = {
++        "case_id": "layout",
++        "ok": True,
++        "output_text": (
++            "<|box_start|>000 000 026 030<|box_end|>"
++            "<|ref_start|>title<|ref_end|><|rotate_up|>\n"
++            "<|box_start|>004 090 995 998<|box_end|>"
++            "<|ref_start|>table<|ref_end|><|rotate_up|>\n"
++            "<|box_start|>100 100 120 120<|box_end|>"
++            "<|ref_start|>text<|ref_end|><|rotate_up|>"
++        ),
++    }
++
++    comparison = compare_case("layout", baseline, candidate)
++
++    assert comparison.layout_baseline_boxes == 2
++    assert comparison.layout_candidate_boxes == 3
++    assert comparison.layout_matched_boxes == 2
++    assert comparison.layout_precision == 2 / 3
++    assert comparison.layout_recall == 1.0
++    assert comparison.layout_f1 == 0.8
++
++
++def test_control_token_repeat_detects_broken_vllm_output():
++    text = "<fcel><lcel><lcel><lcel><lcel>payload"
++
++    assert control_token_ratio(text) > 0.5
++    assert max_consecutive_control_repeat(text) == 4
++
++
++def test_summarize_comparisons_aggregates_case_metrics():
++    comparisons = compare_results(
++        {
++            "text": {
++                "case_id": "text",
++                "ok": True,
++                "output_text": "Abstract optimization",
++            },
++            "table": {
++                "case_id": "table",
++                "ok": True,
++                "output_text": "<fcel>Abstract",
++            },
++        },
++        {
++            "text": {
++                "case_id": "text",
++                "ok": True,
++                "output_text": "Abstract optimization",
++            },
++            "table": {
++                "case_id": "table",
++                "ok": True,
++                "output_text": "<fcel><lcel><lcel>",
++            },
++        },
++    )
++
++    summary = summarize_comparisons(comparisons)
++
++    assert summary["num_cases"] == 2
++    assert summary["num_candidate_ok"] == 2
++    assert summary["mean_similarity"] < 1.0
++    assert summary["max_control_repeat"] == 2
++
++
++def test_quality_gate_passes_when_required_cases_meet_thresholds():
++    comparisons = compare_results(
++        {
++            "text": {
++                "case_id": "text",
++                "ok": True,
++                "output_text": "Abstract optimization",
++            },
++            "table": {
++                "case_id": "table",
++                "ok": True,
++                "output_text": "<fcel>Abstract",
++            },
++            "formula": {
++                "case_id": "formula",
++                "ok": True,
++                "output_text": "noisy formula reference",
++            },
++        },
++        {
++            "text": {
++                "case_id": "text",
++                "ok": True,
++                "output_text": "Abstract optimization",
++            },
++            "table": {
++                "case_id": "table",
++                "ok": True,
++                "output_text": "<fcel>Abstract",
++            },
++            "formula": {
++                "case_id": "formula",
++                "ok": True,
++                "output_text": "different noisy formula",
++            },
++        },
++    )
++
++    assert_quality_thresholds(
++        comparisons,
++        QualityThresholds(
++            min_similarity=0.95,
++            similarity_cases=("text", "table"),
++            max_control_repeat=2,
++            max_control_token_ratio=0.9,
++        ),
++    )
++
++
++def test_quality_gate_fails_on_repeated_control_tokens():
++    comparisons = compare_results(
++        {
++            "table": {
++                "case_id": "table",
++                "ok": True,
++                "output_text": "<fcel>Abstract",
++            },
++        },
++        {
++            "table": {
++                "case_id": "table",
++                "ok": True,
++                "output_text": "<fcel><lcel><lcel><lcel>",
++            },
++        },
++    )
++
++    try:
++        assert_quality_thresholds(
++            comparisons,
++            QualityThresholds(max_control_repeat=2),
++        )
++    except QualityGateError as exc:
++        assert "max_control_repeat" in str(exc)
++    else:
++        raise AssertionError("expected quality gate failure")
+-- 
+2.34.1
+

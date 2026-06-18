@@ -1,0 +1,269 @@
+{
+  "metrics": {
+    "layout_elapsed": 2.556966707925312,
+    "extract_elapsed": 2.7024943130090833,
+    "total_elapsed": 5.3972798810573295,
+    "num_blocks": 23,
+    "num_extracted_blocks": 23,
+    "markdown_chars": 3231,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>078 095 180 161<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>079 164 176 178<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>337 091 656 107<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>395 111 595 142<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>365 164 626 180<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>762 101 850 123<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>769 125 800 141<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>768 143 915 167<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>716 180 913 193<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>158 229 833 252<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>153 268 834 290<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>135 300 852 314<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>301 314 690 327<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>241 328 747 340<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>196 341 794 357<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>253 362 735 376<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>075 417 144 431<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>076 441 912 743<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>074 760 574 774<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>073 817 916 841<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>\n<|box_start|>099 843 435 856<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>\n<|box_start|>078 867 514 881<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>\n<|box_start|>074 881 282 894<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>",
+  "markdown": "The response of flow duration curves to afforestationstation\n\nPatrick N.J. Lane\\(^{a,c,*}\\), Alice E. Best\\(^{b,c,d}\\), Klaus Hickel\\(^{b,c}\\), Lu Zhang\\(^{b,c}\\)\n\n\\( {}^{a} \\) School of Forest and Ecosystem Studies, University of Melbourne, P.O. Box 137, Heidelberg, Victoria 3084, Australia\n\n\\( {}^{b} \\) CSIRO  Division of Land and Water, Canberra, ACT, Australia\n\n\\( {}^{c} \\) Cooperative Research Centre forment Hydrocelogy, Canberra, ACT, Australia\n\n<sup>d</sup>Department of Civil and Environmental Engineering, University of Melbourne, Victoria, Australia\n\nReceived 1 October 2003; revised 22 December 2004; accepted 3 January 2005\n\nAbstract\n\nThe hydrologic effect of replacing pasture or other short crops with trees is reasonably well understood on a mean annual basis. The impact on flow regime, as described by the annual flow duration curve (FDC) is less certain. A method to assess the impact of plantation establishment on FDCs was developed. The starting point for the analyses was the assumption that rainfall and vegetation age are the principal drivers of evapotranspiration. A key objective was to remove the variability in the rainfall signal, leaving changes in streamflow solely attributable to the evapotranspiration of the plantation. A method was developed to (1) fit a model to the observed annual time series of FDC percentiles; i.e. 10th percentile for each year of record with annual rainfall and plantation age as parameters, (2) replace the annual rainfall variation with the long term mean to obtain climate adjusted FDCs, and (3) quantify changes in FDC percentiles as plantations age. Data from 10 catchments from Australia, South Africa and New Zealand were used. The model was able to represent flow variation for the majority of percentiles at eight of the 10 catchments, particularly for the 10-50th percentiles. The adjusted FDCs revealed variable patterns in flow reductions with two types of responses (groups) being identified. Group 1 catchments show a substantial increase in the number of zero flow days, with low flows being more affected than high flows. Group 2 catchments show a more uniform reduction in flows across all percentiles. The differences may be partly explained by storage characteristics. The modelled flow reductions were accord with published results of paired catchment experiments. An additional analysis was performed to characterise the impact of afforestationstation on the number of zero flow days \\((N_{\\mathrm{zero}})\\) for the catchments in group 1. This model performed particularly well, and when adjusted for climate, indicated a significant increase in \\(N_{\\mathrm{zero}}\\). The zero flow day method could be used to determine change in the occurrence of any given flow in response to afforestationstation. The methods used in this study proved satisfactory in removing the rainfall variability, and have added useful insight into the hydrologic impacts of plantation establishment. This approach provides a methodology for understanding catchment response to afforestationstation, where paired catchment data is not available. © 2005 Elsevier B.V. All rights reserved.\n\nKeywords: Afforestation; Flow duration curves; Flow reduction; Paired catchments",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.078,
+        0.095,
+        0.18,
+        0.161
+      ],
+      "angle": 0,
+      "content": "#"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.079,
+        0.164,
+        0.176,
+        0.178
+      ],
+      "angle": 0,
+      "content": "ELSEIER"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.337,
+        0.091,
+        0.656,
+        0.107
+      ],
+      "angle": 0,
+      "content": "Available online at www.sciencedirect.com"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.395,
+        0.111,
+        0.595,
+        0.142
+      ],
+      "angle": 0,
+      "content": "SCIENCE © DIRECT"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.365,
+        0.164,
+        0.626,
+        0.18
+      ],
+      "angle": 0,
+      "content": "Journal of Hydrology 310 (2005) 253-265"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.762,
+        0.101,
+        0.85,
+        0.123
+      ],
+      "angle": 0,
+      "content": "Journal"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.769,
+        0.125,
+        0.8,
+        0.141
+      ],
+      "angle": 0,
+      "content": "of"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.768,
+        0.143,
+        0.915,
+        0.167
+      ],
+      "angle": 0,
+      "content": "Hydrology"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.716,
+        0.18,
+        0.913,
+        0.193
+      ],
+      "angle": 0,
+      "content": "www.elsevier.com/locate/jhydrol"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.158,
+        0.229,
+        0.833,
+        0.252
+      ],
+      "angle": 0,
+      "content": "The response of flow duration curves to afforestationstation"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.153,
+        0.268,
+        0.834,
+        0.29
+      ],
+      "angle": 0,
+      "content": "Patrick N.J. Lane\\(^{a,c,*}\\), Alice E. Best\\(^{b,c,d}\\), Klaus Hickel\\(^{b,c}\\), Lu Zhang\\(^{b,c}\\)"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.135,
+        0.3,
+        0.852,
+        0.314
+      ],
+      "angle": 0,
+      "content": "\\( {}^{a} \\) School of Forest and Ecosystem Studies, University of Melbourne, P.O. Box 137, Heidelberg, Victoria 3084, Australia"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.301,
+        0.314,
+        0.69,
+        0.327
+      ],
+      "angle": 0,
+      "content": "\\( {}^{b} \\) CSIRO  Division of Land and Water, Canberra, ACT, Australia"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.241,
+        0.328,
+        0.747,
+        0.34
+      ],
+      "angle": 0,
+      "content": "\\( {}^{c} \\) Cooperative Research Centre forment Hydrocelogy, Canberra, ACT, Australia"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.196,
+        0.341,
+        0.794,
+        0.357
+      ],
+      "angle": 0,
+      "content": "<sup>d</sup>Department of Civil and Environmental Engineering, University of Melbourne, Victoria, Australia"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.253,
+        0.362,
+        0.735,
+        0.376
+      ],
+      "angle": 0,
+      "content": "Received 1 October 2003; revised 22 December 2004; accepted 3 January 2005"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.075,
+        0.417,
+        0.144,
+        0.431
+      ],
+      "angle": 0,
+      "content": "Abstract"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.076,
+        0.441,
+        0.912,
+        0.743
+      ],
+      "angle": 0,
+      "content": "The hydrologic effect of replacing pasture or other short crops with trees is reasonably well understood on a mean annual basis. The impact on flow regime, as described by the annual flow duration curve (FDC) is less certain. A method to assess the impact of plantation establishment on FDCs was developed. The starting point for the analyses was the assumption that rainfall and vegetation age are the principal drivers of evapotranspiration. A key objective was to remove the variability in the rainfall signal, leaving changes in streamflow solely attributable to the evapotranspiration of the plantation. A method was developed to (1) fit a model to the observed annual time series of FDC percentiles; i.e. 10th percentile for each year of record with annual rainfall and plantation age as parameters, (2) replace the annual rainfall variation with the long term mean to obtain climate adjusted FDCs, and (3) quantify changes in FDC percentiles as plantations age. Data from 10 catchments from Australia, South Africa and New Zealand were used. The model was able to represent flow variation for the majority of percentiles at eight of the 10 catchments, particularly for the 10-50th percentiles. The adjusted FDCs revealed variable patterns in flow reductions with two types of responses (groups) being identified. Group 1 catchments show a substantial increase in the number of zero flow days, with low flows being more affected than high flows. Group 2 catchments show a more uniform reduction in flows across all percentiles. The differences may be partly explained by storage characteristics. The modelled flow reductions were accord with published results of paired catchment experiments. An additional analysis was performed to characterise the impact of afforestationstation on the number of zero flow days \\((N_{\\mathrm{zero}})\\) for the catchments in group 1. This model performed particularly well, and when adjusted for climate, indicated a significant increase in \\(N_{\\mathrm{zero}}\\). The zero flow day method could be used to determine change in the occurrence of any given flow in response to afforestationstation. The methods used in this study proved satisfactory in removing the rainfall variability, and have added useful insight into the hydrologic impacts of plantation establishment. This approach provides a methodology for understanding catchment response to afforestationstation, where paired catchment data is not available. © 2005 Elsevier B.V. All rights reserved."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.074,
+        0.76,
+        0.574,
+        0.774
+      ],
+      "angle": 0,
+      "content": "Keywords: Afforestation; Flow duration curves; Flow reduction; Paired catchments"
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.073,
+        0.817,
+        0.916,
+        0.841
+      ],
+      "angle": 0,
+      "content": "*Corresponding author. Address: Forest Science Centre, Department of Sustainability and Environment, P.O. Box 137, Heidelberg, Vic. 3084, Australia. Tel.: +61 3 9450 8719; fax: +61 3 9450 8464."
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.099,
+        0.843,
+        0.435,
+        0.856
+      ],
+      "angle": 0,
+      "content": "E-mail address:patrickl@unimob.edu.au (P.N.J. Lane)."
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.078,
+        0.867,
+        0.514,
+        0.881
+      ],
+      "angle": 0,
+      "content": "0022-1694/$ - see front matter © 2005 Elsevier B.V. All rights reserved."
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.074,
+        0.881,
+        0.282,
+        0.894
+      ],
+      "angle": 0,
+      "content": "doi:10.1016/j.jhydrol.2005.01.006"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_demo1_p0001/markdown_1781747488.md"
+}

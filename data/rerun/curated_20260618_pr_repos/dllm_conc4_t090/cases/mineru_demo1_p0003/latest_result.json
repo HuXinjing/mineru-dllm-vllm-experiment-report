@@ -1,0 +1,148 @@
+{
+  "metrics": {
+    "layout_elapsed": 1.2761617210926488,
+    "extract_elapsed": 1.7865302320569754,
+    "total_elapsed": 3.213825359940529,
+    "num_blocks": 12,
+    "num_extracted_blocks": 12,
+    "markdown_chars": 4453,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>307 092 684 107<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>888 092 915 106<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>\n<|box_start|>073 123 477 285<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>074 314 171 331<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>074 348 351 365<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>073 380 479 622<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>073 622 479 897<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>511 123 918 189<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>512 211 917 229<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>510 251 914 542<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>512 561 910 601<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>510 622 917 898<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>",
+  "markdown": "were to (1) fit a model to the observed annual time series of FDC percentiles; i.e. 10th percentile for each year of record with annual rainfall and plantation age as parameters, (2) replace the annual rainfall variation with the long term mean to obtain climate adjusted FDCs, and (3) quantify changes in FDC percentiles as plantations. If the climate signal, represented by rainfall, could be successfully removed, the resulting changes in the FDC would be solely attributable to the vegetation.\n\n2. Methods\n\n2.1. Characterisation of flow regime\n\nFlow duration curves display the relationship between streamflow and the percentage of time the streamflow is exceeded as a cumulative density function. They can be constructed for any time period (daily, weekly, monthly, etc.) and provide a graphical and statistical view of historic streamflow variability in a single catchment or a comparison of inter-catchment flow regimes. Vogel and Fennessey (1994) and Smakhin (1999, 2001) demonstrate the utility (and caveats) of FDCs in characterising, comparing and predicting flow regimes at varying temporal scales. Fig. 1 is an example of annual FDCs constructed from daily flows. For the consideration of annual flow regime, daily flows are an appropriate time step for FDC construction.\n\nFDCs were computed from the distribution of daily flows for each year of record based on the appropriate water years (May-April or November-October) for 10 Southern Hemisphere catchments. Each 10th percentile (decile) was extracted from the annual FDCs of each catchment to form the data sets for analysis. For the purpose of characterising changes in each of the deciles, it is assumed that the time series is principally a function of climate and vegetation characteristics. Given rainfall is generally the most important factor affecting streamflow and the most easily accessed data, it is chosen to represent the climate. Catchment physical properties such as soil properties and topography are assumed to be time invariant and therefore their impact on runoff is considered constant throughout the analysis. As trees intercept and transpire at increasing rates until canopy\n\nclosure, a time term is required to represent plantation growth. A simple model relating the time series of each decile with rainfall and vegetation characteristics can be expressed as:\n\n\\[\nQ _ {\\text {胜}} = f (P) + g (T) \\tag {1}\n\\]\n\nwhere \\(Q_{\\%}\\) is the percentile flow, \\(f(P)\\) is a function of rainfall and \\(g(T)\\) is a function of the age of the plantation. Annual rainfall was chosen as the rainfall statistic as it proved to be the most robust predictor of flow over the whole range of flow percentiles, as compared with rainfall percentiles; e.g. median rainfall versus 10th flow percentile. The use of annual rainfall also minimises parameter complexity. The choice of model form is dependent on selecting a function that describes the relationship between forest age and ET. Scott and Smith (1997) demonstrated cumulative reductions in annual and low flows resulting from afforestationstation fitted a sigmoidal function, similar to forest growth functions. Consequently, we used a sigmoidal function to characterise the impact of plantation growth on each flow decile. Fig. 2a is a schematic of the change in the FDC over time. The model took the form:\n\n\\[\nQ _ {\\text {%)}} = a + b (\\Delta P) + \\frac {Y}{1 + \\exp \\left(\\frac {T - T _ {\\mathrm {h a i f}}}{S}\\right)} \\tag {2}\n\\]\n\nwhere \\(Q_{\\%}\\) is the percentile flow (i.e. \\(Q_{50}\\) is the 50th percentile flow), \\(Y\\) and \\(S\\) are coefficients of the sigmoidal term, \\(\\Delta P\\) is the deviation of annual rainfall from the period of record average, and \\(T_{\\mathrm{half}}\\) is the time in years at which half of the reduction in \\(Q_{\\%}\\) due to afforestationstation has taken place. For the average climate condition \\(\\Delta P = 0\\), \\(a\\) becomes the value of \\(Q_{\\%}\\) when the new equilibrium plantation water use under afforestationstation is reached. \\(Y\\) then gives the magnitude of change due to afforestationstation, and \\(S\\) describes the shape of the response as shown in Fig. 2b. For the average pre-treatment condition \\(\\Delta P = 0\\) at \\(T = 0\\), \\(Q_{\\%}\\) approximately equals \\(a + Y\\). Estimation of a pre-afforestationstation condition would not require the time term. Details of the optimisation scheme and sensitivity tests on initial parameter values are given in Lane et al. (2003).",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.307,
+        0.092,
+        0.684,
+        0.107
+      ],
+      "angle": 0,
+      "content": "P.N.J. Lane et al. / Journal of Hydrology 310 (2005) 253-265"
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.888,
+        0.092,
+        0.915,
+        0.106
+      ],
+      "angle": 0,
+      "content": "255"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.073,
+        0.123,
+        0.477,
+        0.285
+      ],
+      "angle": 0,
+      "content": "were to (1) fit a model to the observed annual time series of FDC percentiles; i.e. 10th percentile for each year of record with annual rainfall and plantation age as parameters, (2) replace the annual rainfall variation with the long term mean to obtain climate adjusted FDCs, and (3) quantify changes in FDC percentiles as plantations. If the climate signal, represented by rainfall, could be successfully removed, the resulting changes in the FDC would be solely attributable to the vegetation."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.074,
+        0.314,
+        0.171,
+        0.331
+      ],
+      "angle": 0,
+      "content": "2. Methods"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.074,
+        0.348,
+        0.351,
+        0.365
+      ],
+      "angle": 0,
+      "content": "2.1. Characterisation of flow regime"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.073,
+        0.38,
+        0.479,
+        0.622
+      ],
+      "angle": 0,
+      "content": "Flow duration curves display the relationship between streamflow and the percentage of time the streamflow is exceeded as a cumulative density function. They can be constructed for any time period (daily, weekly, monthly, etc.) and provide a graphical and statistical view of historic streamflow variability in a single catchment or a comparison of inter-catchment flow regimes. Vogel and Fennessey (1994) and Smakhin (1999, 2001) demonstrate the utility (and caveats) of FDCs in characterising, comparing and predicting flow regimes at varying temporal scales. Fig. 1 is an example of annual FDCs constructed from daily flows. For the consideration of annual flow regime, daily flows are an appropriate time step for FDC construction."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.073,
+        0.622,
+        0.479,
+        0.897
+      ],
+      "angle": 0,
+      "content": "FDCs were computed from the distribution of daily flows for each year of record based on the appropriate water years (May-April or November-October) for 10 Southern Hemisphere catchments. Each 10th percentile (decile) was extracted from the annual FDCs of each catchment to form the data sets for analysis. For the purpose of characterising changes in each of the deciles, it is assumed that the time series is principally a function of climate and vegetation characteristics. Given rainfall is generally the most important factor affecting streamflow and the most easily accessed data, it is chosen to represent the climate. Catchment physical properties such as soil properties and topography are assumed to be time invariant and therefore their impact on runoff is considered constant throughout the analysis. As trees intercept and transpire at increasing rates until canopy"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.511,
+        0.123,
+        0.918,
+        0.189
+      ],
+      "angle": 0,
+      "content": "closure, a time term is required to represent plantation growth. A simple model relating the time series of each decile with rainfall and vegetation characteristics can be expressed as:"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.512,
+        0.211,
+        0.917,
+        0.229
+      ],
+      "angle": 0,
+      "content": "\\[\nQ _ {\\text {胜}} = f (P) + g (T) \\tag {1}\n\\]"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.51,
+        0.251,
+        0.914,
+        0.542
+      ],
+      "angle": 0,
+      "content": "where \\(Q_{\\%}\\) is the percentile flow, \\(f(P)\\) is a function of rainfall and \\(g(T)\\) is a function of the age of the plantation. Annual rainfall was chosen as the rainfall statistic as it proved to be the most robust predictor of flow over the whole range of flow percentiles, as compared with rainfall percentiles; e.g. median rainfall versus 10th flow percentile. The use of annual rainfall also minimises parameter complexity. The choice of model form is dependent on selecting a function that describes the relationship between forest age and ET. Scott and Smith (1997) demonstrated cumulative reductions in annual and low flows resulting from afforestationstation fitted a sigmoidal function, similar to forest growth functions. Consequently, we used a sigmoidal function to characterise the impact of plantation growth on each flow decile. Fig. 2a is a schematic of the change in the FDC over time. The model took the form:"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.512,
+        0.561,
+        0.91,
+        0.601
+      ],
+      "angle": 0,
+      "content": "\\[\nQ _ {\\text {%)}} = a + b (\\Delta P) + \\frac {Y}{1 + \\exp \\left(\\frac {T - T _ {\\mathrm {h a i f}}}{S}\\right)} \\tag {2}\n\\]"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.51,
+        0.622,
+        0.917,
+        0.898
+      ],
+      "angle": 0,
+      "content": "where \\(Q_{\\%}\\) is the percentile flow (i.e. \\(Q_{50}\\) is the 50th percentile flow), \\(Y\\) and \\(S\\) are coefficients of the sigmoidal term, \\(\\Delta P\\) is the deviation of annual rainfall from the period of record average, and \\(T_{\\mathrm{half}}\\) is the time in years at which half of the reduction in \\(Q_{\\%}\\) due to afforestationstation has taken place. For the average climate condition \\(\\Delta P = 0\\), \\(a\\) becomes the value of \\(Q_{\\%}\\) when the new equilibrium plantation water use under afforestationstation is reached. \\(Y\\) then gives the magnitude of change due to afforestationstation, and \\(S\\) describes the shape of the response as shown in Fig. 2b. For the average pre-treatment condition \\(\\Delta P = 0\\) at \\(T = 0\\), \\(Q_{\\%}\\) approximately equals \\(a + Y\\). Estimation of a pre-afforestationstation condition would not require the time term. Details of the optimisation scheme and sensitivity tests on initial parameter values are given in Lane et al. (2003)."
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_demo1_p0003/markdown_1781747494.md"
+}

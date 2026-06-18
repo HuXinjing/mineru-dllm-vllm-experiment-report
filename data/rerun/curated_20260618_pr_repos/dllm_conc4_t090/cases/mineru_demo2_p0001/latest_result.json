@@ -1,0 +1,203 @@
+{
+  "metrics": {
+    "layout_elapsed": 1.6802204310661182,
+    "extract_elapsed": 1.3897083810297772,
+    "total_elapsed": 3.2388548819581047,
+    "num_blocks": 17,
+    "num_extracted_blocks": 16,
+    "markdown_chars": 4757,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>167 073 835 144<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>257 161 699 177<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>259 178 731 193<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>358 196 635 210<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>075 239 490 390<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>217 401 349 414<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>074 420 491 602<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>075 602 490 722<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>217 732 349 746<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>074 751 492 919<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>503 237 924 298<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>515 307 917 442<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>503 452 923 513<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>503 540 922 675<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>503 676 924 842<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>503 842 923 919<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>371 953 630 966<|box_end|><|ref_start|>footer<|ref_end|><|rotate_up|>",
+  "markdown": "Real-time Temporal Stereo Matching using Iterative Adaptive Support Weights\n\nJedrzejek Kowalcczuk, Eric T. Psota, and Lance C. Pérez\n\nDepartment of Electrical Engineering, University of Nebraska-Lincoln\n\n[Jkowalczuk2,epsota,lerez]@unl.edu\n\nAbstract--Stereo matching algorithms are nearly always designed to find matches between a single pair of images. A method is presented that was specifically designed to operate on sequences of images. This method considers the cost of matching image points in both the spatial and temporal domain. To maintain real-time operation, a temporal cost aggregation method is used to evaluate the likelihood of matches that is invariant with respect to the number of prior images being considered. This method has been implemented on massively parallel GPU hardware, and the implementation ranks as one of the fastest and most accurate real-time stereo matching methods as measured by the Middlebury stereo performance benchmark.\n\nI. INTRODUCTION\n\nModern stereo matching algorithms achieve excellent results on static stereo images, as demonstrated by the Middlebury stereo performance benchmark [1], [2]. However, their application to stereo video sequences does not guarantee inter-frame consistency of matches extracted from subsequent stereo frame pairs. The lack of temporal consistency of matches between successive frames introduces spurious artifacts in the resulting disparity maps. The problem of obtaining temporally consistent sequences of disparity maps from video streams is known as the temporal stereo correspondence problem, yet the amount of research efforts oriented towards finding an effective solution to this problem is surprisingly small.\n\nA method is proposed for real-time temporal stereo matching that efficiently propagates matching cost information between consecutive frames of a stereo video sequence. This method is invariant to the number of prior frames being considered, and can be easily incorporated into any local stereo method based on edge-aware filters. The iterative adaptive support matching algorithm presented in [3] serves as a foundation for the proposed method.\n\nII. BACKGROUND\n\nStereo matching is the process of identifying correspond correspondences between pixels in stereo images obtained using a pair of synchronized cameras These correspondences are conveniently represented using the notion of disparity, i.e. the positional offset between two matching pixels. It is assumed that the stereo images are rectified, such that matching pixels are confined within corresponding rows of the images and thus disparities are restricted to the horizontal dimension, as illustrated in Figure 1. For visualization purposes, disparities recovered for every pixel of a reference image are stored together in the form of an image, which is known as the\n\ndisparparity map. Note that individual disparities can be converted to actual depths if the geometry of the camera setup is known, i.e., the stereo configuration of cameras has been precalibrated.\n\nFigure 1: Geometry of two horizontally aligned views where \\(\\mathbf{p}\\) denotes a pixel in the reference frame, \\(\\overline{\\mathbf{p}}\\) denotes its matching pixel in the target frame, and \\(d_p\\) denotes the disparity between them along the horizontal dimension.\n\nIn their excellent taxonomy paper [1], Scharstein and Szzelisk classify stereo algorithms as local or global methods. Global methods, which offer outstanding accuracy, are typically derived from an energy minimization framework that allows for explicit integration of disparity smoothness constraints and thus is capable of regularizing the solution in weakly textured areas. The minimization, however, is often achieved using iterative methods or graph cuts, which do not lend themselves well to parallel implementation.\n\nIn contrast, local methods, which are typically built upon the Winner-Takes-All (WA) framework, have the property of computational regularity and are thus suitable for implementation on parallel graphics hardware. Within the WTA framework local stereo algorithms consider a range of disparity hypotheses and compute a volume of pixel-wise dissimilarity metrics between the reference image and the matched image at every considered disparity value. Final disparities are chosen from the cost volume by traversing through its values and selecting the disparities associated with minimum matching costs for every pixel of the reference image.\n\nDisparity maps obtained using this simple strategy are often too noisy to be considered useable To reduce the effects of noise and enforce spatial consistency of matches, local stereo algorithms consider arbitrarily shaped and sized support windows centered at each pixel of the reference image, and",
+  "blocks": [
+    {
+      "type": "title",
+      "bbox": [
+        0.167,
+        0.073,
+        0.835,
+        0.144
+      ],
+      "angle": 0,
+      "content": "Real-time Temporal Stereo Matching using Iterative Adaptive Support Weights"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.257,
+        0.161,
+        0.699,
+        0.177
+      ],
+      "angle": 0,
+      "content": "Jedrzejek Kowalcczuk, Eric T. Psota, and Lance C. Pérez"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.259,
+        0.178,
+        0.731,
+        0.193
+      ],
+      "angle": 0,
+      "content": "Department of Electrical Engineering, University of Nebraska-Lincoln"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.358,
+        0.196,
+        0.635,
+        0.21
+      ],
+      "angle": 0,
+      "content": "[Jkowalczuk2,epsota,lerez]@unl.edu"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.075,
+        0.239,
+        0.49,
+        0.39
+      ],
+      "angle": 0,
+      "content": "Abstract--Stereo matching algorithms are nearly always designed to find matches between a single pair of images. A method is presented that was specifically designed to operate on sequences of images. This method considers the cost of matching image points in both the spatial and temporal domain. To maintain real-time operation, a temporal cost aggregation method is used to evaluate the likelihood of matches that is invariant with respect to the number of prior images being considered. This method has been implemented on massively parallel GPU hardware, and the implementation ranks as one of the fastest and most accurate real-time stereo matching methods as measured by the Middlebury stereo performance benchmark."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.217,
+        0.401,
+        0.349,
+        0.414
+      ],
+      "angle": 0,
+      "content": "I. INTRODUCTION"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.074,
+        0.42,
+        0.491,
+        0.602
+      ],
+      "angle": 0,
+      "content": "Modern stereo matching algorithms achieve excellent results on static stereo images, as demonstrated by the Middlebury stereo performance benchmark [1], [2]. However, their application to stereo video sequences does not guarantee inter-frame consistency of matches extracted from subsequent stereo frame pairs. The lack of temporal consistency of matches between successive frames introduces spurious artifacts in the resulting disparity maps. The problem of obtaining temporally consistent sequences of disparity maps from video streams is known as the temporal stereo correspondence problem, yet the amount of research efforts oriented towards finding an effective solution to this problem is surprisingly small."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.075,
+        0.602,
+        0.49,
+        0.722
+      ],
+      "angle": 0,
+      "content": "A method is proposed for real-time temporal stereo matching that efficiently propagates matching cost information between consecutive frames of a stereo video sequence. This method is invariant to the number of prior frames being considered, and can be easily incorporated into any local stereo method based on edge-aware filters. The iterative adaptive support matching algorithm presented in [3] serves as a foundation for the proposed method."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.217,
+        0.732,
+        0.349,
+        0.746
+      ],
+      "angle": 0,
+      "content": "II. BACKGROUND"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.074,
+        0.751,
+        0.492,
+        0.919
+      ],
+      "angle": 0,
+      "content": "Stereo matching is the process of identifying correspond correspondences between pixels in stereo images obtained using a pair of synchronized cameras These correspondences are conveniently represented using the notion of disparity, i.e. the positional offset between two matching pixels. It is assumed that the stereo images are rectified, such that matching pixels are confined within corresponding rows of the images and thus disparities are restricted to the horizontal dimension, as illustrated in Figure 1. For visualization purposes, disparities recovered for every pixel of a reference image are stored together in the form of an image, which is known as the"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.503,
+        0.237,
+        0.924,
+        0.298
+      ],
+      "angle": 0,
+      "content": "disparparity map. Note that individual disparities can be converted to actual depths if the geometry of the camera setup is known, i.e., the stereo configuration of cameras has been precalibrated."
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.515,
+        0.307,
+        0.917,
+        0.442
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.503,
+        0.452,
+        0.923,
+        0.513
+      ],
+      "angle": 0,
+      "content": "Figure 1: Geometry of two horizontally aligned views where \\(\\mathbf{p}\\) denotes a pixel in the reference frame, \\(\\overline{\\mathbf{p}}\\) denotes its matching pixel in the target frame, and \\(d_p\\) denotes the disparity between them along the horizontal dimension."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.503,
+        0.54,
+        0.922,
+        0.675
+      ],
+      "angle": 0,
+      "content": "In their excellent taxonomy paper [1], Scharstein and Szzelisk classify stereo algorithms as local or global methods. Global methods, which offer outstanding accuracy, are typically derived from an energy minimization framework that allows for explicit integration of disparity smoothness constraints and thus is capable of regularizing the solution in weakly textured areas. The minimization, however, is often achieved using iterative methods or graph cuts, which do not lend themselves well to parallel implementation."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.503,
+        0.676,
+        0.924,
+        0.842
+      ],
+      "angle": 0,
+      "content": "In contrast, local methods, which are typically built upon the Winner-Takes-All (WA) framework, have the property of computational regularity and are thus suitable for implementation on parallel graphics hardware. Within the WTA framework local stereo algorithms consider a range of disparity hypotheses and compute a volume of pixel-wise dissimilarity metrics between the reference image and the matched image at every considered disparity value. Final disparities are chosen from the cost volume by traversing through its values and selecting the disparities associated with minimum matching costs for every pixel of the reference image."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.503,
+        0.842,
+        0.923,
+        0.919
+      ],
+      "angle": 0,
+      "content": "Disparity maps obtained using this simple strategy are often too noisy to be considered useable To reduce the effects of noise and enforce spatial consistency of matches, local stereo algorithms consider arbitrarily shaped and sized support windows centered at each pixel of the reference image, and"
+    },
+    {
+      "type": "footer",
+      "bbox": [
+        0.371,
+        0.953,
+        0.63,
+        0.966
+      ],
+      "angle": 0,
+      "content": "978-1-4673-5208-6/13/$31.00 ©2013 IEEE"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_demo2_p0001/markdown_1781747497.md"
+}

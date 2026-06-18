@@ -1,0 +1,71 @@
+{
+  "metrics": {
+    "layout_elapsed": 0.7070437779184431,
+    "extract_elapsed": 0.4836397069739178,
+    "total_elapsed": 1.296573537052609,
+    "num_blocks": 5,
+    "num_extracted_blocks": 5,
+    "markdown_chars": 1396,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>278 085 720 110<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>108 128 897 182<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>102 209 895 281<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>102 307 895 396<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>106 422 899 514<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>",
+  "markdown": "PDF 3: InfinFlow Company History\n\nInfinFlow is the company behind the open source projects Infinity and RAGFlow. Public profiles describe InfinFlow as an AI infrastructure provider headquartered in Shanghai, China, founded in 2023.\n\nThe team's early work focused on the data layer needed for retrieval augmented generation. In late 2023, InfinFlow open sourced Infinity, an AI native database designed to support RAG style workloads, including fast search and efficient indexing. Soon after, the company expanded from database infrastructure into an end-to-end RAG application stack.\n\nOn April 1, 2024, InfinFlow open sourced RAGFlow as a complete RAG engine. The project emphasizes deep document understanding, a robust ingestion pipeline, and retrieval that can support enterprise use cases. Since the open source release, RAGFlow has grown rapidly on GitHub and is maintained in the public拉萨low organization, alongside documentation and frequent versioned releases.\n\nIn practice, this history reflects a move from building the foundation, storage and retrieval, to delivering a full developer platform. Today, InformiFlow positions RAGFlow as a context layer for AI agents, combining ingestion, indexing, retrieval, and chat or agent workflows into one platform. The company continues to publish tutorials, release notes, and improvements that track the fast pace of the open source ecosystem.",
+  "blocks": [
+    {
+      "type": "title",
+      "bbox": [
+        0.278,
+        0.085,
+        0.72,
+        0.11
+      ],
+      "angle": 0,
+      "content": "PDF 3: InfinFlow Company History"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.108,
+        0.128,
+        0.897,
+        0.182
+      ],
+      "angle": 0,
+      "content": "InfinFlow is the company behind the open source projects Infinity and RAGFlow. Public profiles describe InfinFlow as an AI infrastructure provider headquartered in Shanghai, China, founded in 2023."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.102,
+        0.209,
+        0.895,
+        0.281
+      ],
+      "angle": 0,
+      "content": "The team's early work focused on the data layer needed for retrieval augmented generation. In late 2023, InfinFlow open sourced Infinity, an AI native database designed to support RAG style workloads, including fast search and efficient indexing. Soon after, the company expanded from database infrastructure into an end-to-end RAG application stack."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.102,
+        0.307,
+        0.895,
+        0.396
+      ],
+      "angle": 0,
+      "content": "On April 1, 2024, InfinFlow open sourced RAGFlow as a complete RAG engine. The project emphasizes deep document understanding, a robust ingestion pipeline, and retrieval that can support enterprise use cases. Since the open source release, RAGFlow has grown rapidly on GitHub and is maintained in the public拉萨low organization, alongside documentation and frequent versioned releases."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.106,
+        0.422,
+        0.899,
+        0.514
+      ],
+      "angle": 0,
+      "content": "In practice, this history reflects a move from building the foundation, storage and retrieval, to delivering a full developer platform. Today, InformiFlow positions RAGFlow as a context layer for AI agents, combining ingestion, indexing, retrieval, and chat or agent workflows into one platform. The company continues to publish tutorials, release notes, and improvements that track the fast pace of the open source ecosystem."
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/ragflow_doc3_p0001/markdown_1781747560.md"
+}

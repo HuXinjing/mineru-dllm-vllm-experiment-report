@@ -1,0 +1,338 @@
+{
+  "metrics": {
+    "layout_elapsed": 4.056718184961937,
+    "num_blocks": 29,
+    "num_extracted_blocks": 29,
+    "markdown_chars": 3992,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>119 089 882 110<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>269 125 732 160<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>368 161 639 178<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>425 179 575 195<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>344 195 650 211<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>369 212 636 226<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>262 253 342 267<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>146 280 463 678<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>113 690 261 706<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>112 717 490 828<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>112 829 489 862<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>112 868 490 918<|box_end|><|ref_start|>page_footnote<|ref_end|><|rotate_up|>\n<|box_start|>611 264 785 305<|box_end|><|ref_start|>table<|ref_end|><|rotate_up|>\n<|box_start|>510 308 859 321<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>511 321 638 333<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>512 334 599 345<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>511 345 788 357<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>513 358 657 368<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>511 372 883 408<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>560 423 835 474<|box_end|><|ref_start|>table<|ref_end|><|rotate_up|>\n<|box_start|>510 479 819 492<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>511 493 700 504<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>513 505 604 516<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>511 517 721 527<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>510 528 862 541<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>510 544 882 570<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>508 580 881 637<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>507 646 883 919<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>021 309 067 720<|box_end|><|ref_start|>aside_text<|ref_end|><|rotate_left|>",
+  "markdown": "TABLEFORMER: Robust Transformer Modeling for Table-Text Encoding\n\nJingfeng Yang* Aditya Gupta† Shyam Upadhyay†  \nLuheng He† Rahulul Goel† Shachi Paul†\n\n*Georgia Institute of Technology\n\nGoogle Assistant\n\njingfengyangpku@gmail.com\n\ntableformer-google.com\n\nAbstract\n\nUnderstanding tables is an important aspect of natural language understanding. Existing models for table understanding require linearization of the table structure, where row or column order is encoded as an unwanted bias. Such spurious biases make the model vulnerable to row and column order perturbations. Additionally, prior work has not thoroughly modeled the table structures or table-text alignments, hindering the table-text understanding ability. In this work, we propose a robust and structurally aware table-text encoding architecture TABLEFORMER, where tabular structural biases are incorporated completely through learnable attention biases. TABLEFORMER is (1) strictly invariant to row and column orders, and, (2) could understand tables better due to its tabular inductive biases. Our evaluations showed that TABLEFORMER outperforms strong baselines in all settings on SQA, WTQ and TABFACT table reasoning datasets, and achieves state-of-the-art performance on SQA, especially when facing answer-invariant row and column order perturbations (6% improvement over the best baseline), because previous SOTA models' performance drops by 4% - 6% when facing such perturbations while TABLEFORMER is not affected.1\n\n1 Introduction\n\nRecently, semi-structured data (e.g. variable length tables without a fixed data schema) has attracted more attention because of its ubiquitous presence on the web. On a wide range of various table reasoning tasks, Transformer based architecture along with pretraining has shown to perform well (Eisenschlos et al., 2021; Liu et al., 2021).\n\nIn a nutshell, prior work used the Transformerer architecture in a BERT like fashion by serializing\n\n<table><tr><td>Title</td><td>Length</td></tr><tr><td>Screwed Up</td><td>5:02</td></tr><tr><td>Ghetto Queen</td><td>5:00</td></tr></table>\n\nQuestion: Of all song lengths, which one is the longest?\n\nGold Answer: 5:02\n\nTAPAS: 5:00\n\nTAPAS after row order perturbation: 5:02\n\nTABLEFORMER: 5:02\n\n(a) TAPAS predicts incorrect answer based on the original table, while it gives the correct answer if the first row is moved to the end of the table.\n\n<table><tr><td>Nation</td><td>Gold</td><td>Silver</td><td>Bronze</td></tr><tr><td>Great Britain</td><td>2</td><td>1</td><td>2</td></tr><tr><td>Spain</td><td>1</td><td>2</td><td>0</td></tr><tr><td>Ukraine</td><td>0</td><td>2</td><td>0</td></tr></table>\n\nQuestion: Which nation received 2 silver medals?\n\nGold Answer: Spain, Ukraine\n\nTAPAS: Spain\n\nTABLEFORMER: Spain, Ukraine\n\nTABLEFORMER w/o a proposed structural bias: Spain\n\n(b) TAPAS gives incomplete answer due to its limited cell grounding ability.\n\nFigure 1: Examples showing the limitations of existing models (a) vulnerable to perturbations, and (b) lacking structural biases. In contrast, our proposed TABLE-FORMER predicts correct answers for both questions.\n\ntables or rows into word sequences (Yu et al., 2020; Liu et al., 2021), where original position ids are used as positional information. Due to the usage of row/column ids and global position ids, prior strategies to linearize table structures introduced spuriousurious row and column order biases (Herzig et al., 2020; Eisenschlos et al., 2020, 2021; Zhang et al., 2020; Yin et al., 2020). Therefore, those models are vulnerable to row or column order perturbations. But, ideally, the model should make consistent predictions regardless of the row or column ordering for all practical purposes. For instance, in Figure 1, the predicted answer of TAPAS Model (Herzig et al., 2020) for Question (a) \"Of all song lengths, which one is the longest?\" based on the original table is \"5:00\", which is incorrect. However, if the first row is adjusted to the end of the table during inference,",
+  "blocks": [
+    {
+      "type": "title",
+      "bbox": [
+        0.119,
+        0.089,
+        0.882,
+        0.11
+      ],
+      "angle": 0,
+      "content": "TABLEFORMER: Robust Transformer Modeling for Table-Text Encoding"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.269,
+        0.125,
+        0.732,
+        0.16
+      ],
+      "angle": 0,
+      "content": "Jingfeng Yang* Aditya Gupta† Shyam Upadhyay†  \nLuheng He† Rahulul Goel† Shachi Paul†"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.368,
+        0.161,
+        0.639,
+        0.178
+      ],
+      "angle": 0,
+      "content": "*Georgia Institute of Technology"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.425,
+        0.179,
+        0.575,
+        0.195
+      ],
+      "angle": 0,
+      "content": "Google Assistant"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.344,
+        0.195,
+        0.65,
+        0.211
+      ],
+      "angle": 0,
+      "content": "jingfengyangpku@gmail.com"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.369,
+        0.212,
+        0.636,
+        0.226
+      ],
+      "angle": 0,
+      "content": "tableformer-google.com"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.262,
+        0.253,
+        0.342,
+        0.267
+      ],
+      "angle": 0,
+      "content": "Abstract"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.146,
+        0.28,
+        0.463,
+        0.678
+      ],
+      "angle": 0,
+      "content": "Understanding tables is an important aspect of natural language understanding. Existing models for table understanding require linearization of the table structure, where row or column order is encoded as an unwanted bias. Such spurious biases make the model vulnerable to row and column order perturbations. Additionally, prior work has not thoroughly modeled the table structures or table-text alignments, hindering the table-text understanding ability. In this work, we propose a robust and structurally aware table-text encoding architecture TABLEFORMER, where tabular structural biases are incorporated completely through learnable attention biases. TABLEFORMER is (1) strictly invariant to row and column orders, and, (2) could understand tables better due to its tabular inductive biases. Our evaluations showed that TABLEFORMER outperforms strong baselines in all settings on SQA, WTQ and TABFACT table reasoning datasets, and achieves state-of-the-art performance on SQA, especially when facing answer-invariant row and column order perturbations (6% improvement over the best baseline), because previous SOTA models' performance drops by 4% - 6% when facing such perturbations while TABLEFORMER is not affected.1"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.113,
+        0.69,
+        0.261,
+        0.706
+      ],
+      "angle": 0,
+      "content": "1 Introduction"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.112,
+        0.717,
+        0.49,
+        0.828
+      ],
+      "angle": 0,
+      "content": "Recently, semi-structured data (e.g. variable length tables without a fixed data schema) has attracted more attention because of its ubiquitous presence on the web. On a wide range of various table reasoning tasks, Transformer based architecture along with pretraining has shown to perform well (Eisenschlos et al., 2021; Liu et al., 2021)."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.112,
+        0.829,
+        0.489,
+        0.862
+      ],
+      "angle": 0,
+      "content": "In a nutshell, prior work used the Transformerer architecture in a BERT like fashion by serializing"
+    },
+    {
+      "type": "page_footnote",
+      "bbox": [
+        0.112,
+        0.868,
+        0.49,
+        0.918
+      ],
+      "angle": 0,
+      "content": "*Work done during an internship at Google.\n*Code has been released at https://github.com.google-research/t/opt/blog/master/TABLEFORMER.md"
+    },
+    {
+      "type": "table",
+      "bbox": [
+        0.611,
+        0.264,
+        0.785,
+        0.305
+      ],
+      "angle": 0,
+      "content": "<table><tr><td>Title</td><td>Length</td></tr><tr><td>Screwed Up</td><td>5:02</td></tr><tr><td>Ghetto Queen</td><td>5:00</td></tr></table>"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.51,
+        0.308,
+        0.859,
+        0.321
+      ],
+      "angle": 0,
+      "content": "Question: Of all song lengths, which one is the longest?"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.511,
+        0.321,
+        0.638,
+        0.333
+      ],
+      "angle": 0,
+      "content": "Gold Answer: 5:02"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.512,
+        0.334,
+        0.599,
+        0.345
+      ],
+      "angle": 0,
+      "content": "TAPAS: 5:00"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.511,
+        0.345,
+        0.788,
+        0.357
+      ],
+      "angle": 0,
+      "content": "TAPAS after row order perturbation: 5:02"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.513,
+        0.358,
+        0.657,
+        0.368
+      ],
+      "angle": 0,
+      "content": "TABLEFORMER: 5:02"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.511,
+        0.372,
+        0.883,
+        0.408
+      ],
+      "angle": 0,
+      "content": "(a) TAPAS predicts incorrect answer based on the original table, while it gives the correct answer if the first row is moved to the end of the table."
+    },
+    {
+      "type": "table",
+      "bbox": [
+        0.56,
+        0.423,
+        0.835,
+        0.474
+      ],
+      "angle": 0,
+      "content": "<table><tr><td>Nation</td><td>Gold</td><td>Silver</td><td>Bronze</td></tr><tr><td>Great Britain</td><td>2</td><td>1</td><td>2</td></tr><tr><td>Spain</td><td>1</td><td>2</td><td>0</td></tr><tr><td>Ukraine</td><td>0</td><td>2</td><td>0</td></tr></table>"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.51,
+        0.479,
+        0.819,
+        0.492
+      ],
+      "angle": 0,
+      "content": "Question: Which nation received 2 silver medals?"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.511,
+        0.493,
+        0.7,
+        0.504
+      ],
+      "angle": 0,
+      "content": "Gold Answer: Spain, Ukraine"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.513,
+        0.505,
+        0.604,
+        0.516
+      ],
+      "angle": 0,
+      "content": "TAPAS: Spain"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.511,
+        0.517,
+        0.721,
+        0.527
+      ],
+      "angle": 0,
+      "content": "TABLEFORMER: Spain, Ukraine"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.51,
+        0.528,
+        0.862,
+        0.541
+      ],
+      "angle": 0,
+      "content": "TABLEFORMER w/o a proposed structural bias: Spain"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.51,
+        0.544,
+        0.882,
+        0.57
+      ],
+      "angle": 0,
+      "content": "(b) TAPAS gives incomplete answer due to its limited cell grounding ability."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.508,
+        0.58,
+        0.881,
+        0.637
+      ],
+      "angle": 0,
+      "content": "Figure 1: Examples showing the limitations of existing models (a) vulnerable to perturbations, and (b) lacking structural biases. In contrast, our proposed TABLE-FORMER predicts correct answers for both questions."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.507,
+        0.646,
+        0.883,
+        0.919
+      ],
+      "angle": 0,
+      "content": "tables or rows into word sequences (Yu et al., 2020; Liu et al., 2021), where original position ids are used as positional information. Due to the usage of row/column ids and global position ids, prior strategies to linearize table structures introduced spuriousurious row and column order biases (Herzig et al., 2020; Eisenschlos et al., 2020, 2021; Zhang et al., 2020; Yin et al., 2020). Therefore, those models are vulnerable to row or column order perturbations. But, ideally, the model should make consistent predictions regardless of the row or column ordering for all practical purposes. For instance, in Figure 1, the predicted answer of TAPAS Model (Herzig et al., 2020) for Question (a) \"Of all song lengths, which one is the longest?\" based on the original table is \"5:00\", which is incorrect. However, if the first row is adjusted to the end of the table during inference,"
+    },
+    {
+      "type": "aside_text",
+      "bbox": [
+        0.021,
+        0.309,
+        0.067,
+        0.72
+      ],
+      "angle": 270,
+      "content": "arXiv:2203.00274v2 [cs.CL] 3 May 2022"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_demo3_p0001/markdown_1781747319.md"
+}

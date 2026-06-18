@@ -1,0 +1,211 @@
+{
+  "cases": [
+    {
+      "case_id": "mineru_demo1_p0001",
+      "doc_id": "mineru_demo1",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo1.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo1_p0001.png",
+      "width": 1088,
+      "height": 1486
+    },
+    {
+      "case_id": "mineru_demo1_p0002",
+      "doc_id": "mineru_demo1",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo1.pdf",
+      "page_index": 1,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo1_p0002.png",
+      "width": 1088,
+      "height": 1486
+    },
+    {
+      "case_id": "mineru_demo1_p0003",
+      "doc_id": "mineru_demo1",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo1.pdf",
+      "page_index": 2,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo1_p0003.png",
+      "width": 1088,
+      "height": 1486
+    },
+    {
+      "case_id": "mineru_demo2_p0001",
+      "doc_id": "mineru_demo2",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo2.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo2_p0001.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_demo2_p0002",
+      "doc_id": "mineru_demo2",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo2.pdf",
+      "page_index": 1,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo2_p0002.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_demo2_p0003",
+      "doc_id": "mineru_demo2",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo2.pdf",
+      "page_index": 2,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo2_p0003.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_demo3_p0001",
+      "doc_id": "mineru_demo3",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo3.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo3_p0001.png",
+      "width": 1191,
+      "height": 1684
+    },
+    {
+      "case_id": "mineru_demo3_p0002",
+      "doc_id": "mineru_demo3",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo3.pdf",
+      "page_index": 1,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo3_p0002.png",
+      "width": 1191,
+      "height": 1684
+    },
+    {
+      "case_id": "mineru_demo3_p0003",
+      "doc_id": "mineru_demo3",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/demo3.pdf",
+      "page_index": 2,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_demo3_p0003.png",
+      "width": 1191,
+      "height": 1684
+    },
+    {
+      "case_id": "mineru_small_ocr_p0001",
+      "doc_id": "mineru_small_ocr",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/small_ocr.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_small_ocr_p0001.png",
+      "width": 2451,
+      "height": 3600
+    },
+    {
+      "case_id": "mineru_small_ocr_p0002",
+      "doc_id": "mineru_small_ocr",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/small_ocr.pdf",
+      "page_index": 1,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_small_ocr_p0002.png",
+      "width": 2451,
+      "height": 3600
+    },
+    {
+      "case_id": "mineru_small_ocr_p0003",
+      "doc_id": "mineru_small_ocr",
+      "pdf_path": "<MINERU_REPO>/demo/pdfs/small_ocr.pdf",
+      "page_index": 2,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_small_ocr_p0003.png",
+      "width": 2451,
+      "height": 3600
+    },
+    {
+      "case_id": "mineru_unit_test_p0001",
+      "doc_id": "mineru_unit_test",
+      "pdf_path": "<MINERU_REPO>/tests/unittest/pdfs/test.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_unit_test_p0001.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0001",
+      "doc_id": "mineru_diffusion_paper",
+      "pdf_path": "<MINERU_DIFFUSION_REPO>/docs/MinerU-Diffusion-V1.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_diffusion_paper_p0001.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0002",
+      "doc_id": "mineru_diffusion_paper",
+      "pdf_path": "<MINERU_DIFFUSION_REPO>/docs/MinerU-Diffusion-V1.pdf",
+      "page_index": 1,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_diffusion_paper_p0002.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0003",
+      "doc_id": "mineru_diffusion_paper",
+      "pdf_path": "<MINERU_DIFFUSION_REPO>/docs/MinerU-Diffusion-V1.pdf",
+      "page_index": 2,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_diffusion_paper_p0003.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0006",
+      "doc_id": "mineru_diffusion_paper",
+      "pdf_path": "<MINERU_DIFFUSION_REPO>/docs/MinerU-Diffusion-V1.pdf",
+      "page_index": 5,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_diffusion_paper_p0006.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0011",
+      "doc_id": "mineru_diffusion_paper",
+      "pdf_path": "<MINERU_DIFFUSION_REPO>/docs/MinerU-Diffusion-V1.pdf",
+      "page_index": 10,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_diffusion_paper_p0011.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0021",
+      "doc_id": "mineru_diffusion_paper",
+      "pdf_path": "<MINERU_DIFFUSION_REPO>/docs/MinerU-Diffusion-V1.pdf",
+      "page_index": 20,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_diffusion_paper_p0021.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0033",
+      "doc_id": "mineru_diffusion_paper",
+      "pdf_path": "<MINERU_DIFFUSION_REPO>/docs/MinerU-Diffusion-V1.pdf",
+      "page_index": 32,
+      "image_path": "manifests/pdf_suite_coverage/images/mineru_diffusion_paper_p0033.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "ragflow_doc1_p0001",
+      "doc_id": "ragflow_doc1",
+      "pdf_path": "<RAGFLOW_TEST_DOCS>/Doc1.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/ragflow_doc1_p0001.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "ragflow_doc2_p0001",
+      "doc_id": "ragflow_doc2",
+      "pdf_path": "<RAGFLOW_TEST_DOCS>/Doc2.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/ragflow_doc2_p0001.png",
+      "width": 1224,
+      "height": 1584
+    },
+    {
+      "case_id": "ragflow_doc3_p0001",
+      "doc_id": "ragflow_doc3",
+      "pdf_path": "<RAGFLOW_TEST_DOCS>/Doc3.pdf",
+      "page_index": 0,
+      "image_path": "manifests/pdf_suite_coverage/images/ragflow_doc3_p0001.png",
+      "width": 1224,
+      "height": 1584
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "metrics": {
+    "layout_elapsed": 0.8802443060558289,
+    "num_blocks": 4,
+    "num_extracted_blocks": 4,
+    "markdown_chars": 1332,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>343 087 656 108<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>108 128 891 197<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>108 228 891 294<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>107 326 891 447<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>",
+  "markdown": "PDF 2: Definition of RAG\n\nretrievalval-Augmented Generation, usually called RAG, is a pattern for building AI systems that answer questions with help from an external knowledge base. Instead of relying only on what a model learned during training, a RAG system first retrieves relevant information from your documents or databases, then uses that retrieved material to generate the final answer.\n\nA simple RAG loop has four steps. First, you ingest content and create an index, often using embeddings in a vector store, sometimes combined with keyword search. Second, the user asks a question. Third, the system retrieves the best matching passages. Finally, the model generates a response conditioned on those passages.\n\nRAG is useful because it improves accuracy, keeps answers up to date as your data changes, and provides a path to citations and auditing. It can also help enforce access control by retrieving only what the user is allowed to see. Common uses include internal knowledge assistants, customer support bots, research tools, and document analysis workflows. In evaluation, teams measure retrieval quality, answer faithfulness, and latency to confirm the system stays at scale. Good systems add guardrails such as citation requirements, answer refusal when evidence is missing, and clear logging for troubleshooting.",
+  "blocks": [
+    {
+      "type": "title",
+      "bbox": [
+        0.343,
+        0.087,
+        0.656,
+        0.108
+      ],
+      "angle": 0,
+      "content": "PDF 2: Definition of RAG"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.108,
+        0.128,
+        0.891,
+        0.197
+      ],
+      "angle": 0,
+      "content": "retrievalval-Augmented Generation, usually called RAG, is a pattern for building AI systems that answer questions with help from an external knowledge base. Instead of relying only on what a model learned during training, a RAG system first retrieves relevant information from your documents or databases, then uses that retrieved material to generate the final answer."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.108,
+        0.228,
+        0.891,
+        0.294
+      ],
+      "angle": 0,
+      "content": "A simple RAG loop has four steps. First, you ingest content and create an index, often using embeddings in a vector store, sometimes combined with keyword search. Second, the user asks a question. Third, the system retrieves the best matching passages. Finally, the model generates a response conditioned on those passages."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.107,
+        0.326,
+        0.891,
+        0.447
+      ],
+      "angle": 0,
+      "content": "RAG is useful because it improves accuracy, keeps answers up to date as your data changes, and provides a path to citations and auditing. It can also help enforce access control by retrieving only what the user is allowed to see. Common uses include internal knowledge assistants, customer support bots, research tools, and document analysis workflows. In evaluation, teams measure retrieval quality, answer faithfulness, and latency to confirm the system stays at scale. Good systems add guardrails such as citation requirements, answer refusal when evidence is missing, and clear logging for troubleshooting."
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/ragflow_doc2_p0001/markdown_1781747319.md"
+}

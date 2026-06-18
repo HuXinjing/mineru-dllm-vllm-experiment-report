@@ -1,0 +1,57 @@
+{
+  "pro_baseline": {
+    "path": "benchmark_results/mineru_diffusion/pdf_suite_mineru25pro_vllm_http_conc4_tied",
+    "num_cases": 23,
+    "num_ok": 23,
+    "total_latency_s": 70.78216402803082,
+    "mean_latency_s": 3.077485392523079,
+    "markdown_chars": 76331,
+    "note": "MinerU2.5-Pro served via vLLM OpenAI HTTP using mineru25pro_tied_model and client max_concurrency=4."
+  },
+  "comparisons": [
+    {
+      "threshold": "0.80",
+      "dllm_total_latency_s": 73.34463171614334,
+      "pro_total_latency_s": 70.78216402803082,
+      "speedup_pro_over_dllm": 0.96506264155733,
+      "dllm_vs_pro_latency_pct": 3.620216651044661,
+      "markdown_similarity": 0.8735402280383435,
+      "layout_f1": 0.8785080846849129,
+      "dllm_markdown_chars": 68819,
+      "pro_markdown_chars": 76331
+    },
+    {
+      "threshold": "0.85",
+      "dllm_total_latency_s": 76.24436434486415,
+      "pro_total_latency_s": 70.78216402803082,
+      "speedup_pro_over_dllm": 0.9283592910273732,
+      "dllm_vs_pro_latency_pct": 7.716916248378913,
+      "markdown_similarity": 0.8800360051302745,
+      "layout_f1": 0.8518633792409602,
+      "dllm_markdown_chars": 75848,
+      "pro_markdown_chars": 76331
+    },
+    {
+      "threshold": "0.90",
+      "dllm_total_latency_s": 71.84287902899086,
+      "pro_total_latency_s": 70.78216402803082,
+      "speedup_pro_over_dllm": 0.9852356278688106,
+      "dllm_vs_pro_latency_pct": 1.4985625482430542,
+      "markdown_similarity": 0.8750458648040991,
+      "layout_f1": 0.8646616806737265,
+      "dllm_markdown_chars": 68192,
+      "pro_markdown_chars": 76331
+    },
+    {
+      "threshold": "0.95",
+      "dllm_total_latency_s": 84.25033815205097,
+      "pro_total_latency_s": 70.78216402803082,
+      "speedup_pro_over_dllm": 0.8401410081023837,
+      "dllm_vs_pro_latency_pct": 19.02763826023537,
+      "markdown_similarity": 0.8756855718117752,
+      "layout_f1": 0.8582555483210887,
+      "dllm_markdown_chars": 71657,
+      "pro_markdown_chars": 76331
+    }
+  ]
+}

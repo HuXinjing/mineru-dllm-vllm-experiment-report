@@ -1,0 +1,33 @@
+{
+  "num_cases": 23,
+  "num_ok": 23,
+  "num_failed": 0,
+  "mean_latency_s": 2.3168612741662757,
+  "p50_latency_s": 2.1034680058946833,
+  "max_latency_s": 5.916741697001271,
+  "total_latency_s": 53.28780930582434,
+  "markdown_chars": 0,
+  "markdown_chars_per_s": 0.0,
+  "block_type_counts": {
+    "header": 24,
+    "title": 40,
+    "text": 194,
+    "page_footnote": 11,
+    "page_number": 13,
+    "image": 8,
+    "image_caption": 12,
+    "equation": 16,
+    "footer": 1,
+    "table": 7,
+    "aside_text": 1,
+    "list": 12,
+    "table_caption": 2
+  },
+  "content_concurrency": 0,
+  "layout_concurrency": 4,
+  "throughput_wall_elapsed_s": 14.1763536069775,
+  "throughput_layout_wall_elapsed_s": 14.1763536069775,
+  "throughput_extract_wall_elapsed_s": 0.0,
+  "throughput_pages_per_s": 1.6224200268734525,
+  "throughput_markdown_chars_per_s": 0.0
+}

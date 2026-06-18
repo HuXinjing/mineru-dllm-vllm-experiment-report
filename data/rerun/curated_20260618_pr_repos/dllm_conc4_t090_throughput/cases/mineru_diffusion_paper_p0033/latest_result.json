@@ -1,0 +1,129 @@
+{
+  "metrics": {
+    "layout_elapsed": 2.0711237769573927,
+    "num_blocks": 10,
+    "num_extracted_blocks": 8,
+    "markdown_chars": 572,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>136 078 837 096<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>427 191 572 208<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>272 294 353 311<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>141 319 487 345<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>142 356 487 739<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>648 303 726 320<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>516 328 861 356<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>513 371 862 731<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>264 826 735 844<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>490 938 509 951<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "Formula Decoding\n\nExample 1\n\n\\[\n\\psi_ {R} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ i \\left(\\chi + \\frac {\\sqrt {\\chi}}{2}\\right) \\right], \\quad \\psi_ {L} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ - i \\left(\\chi - \\frac {\\sqrt {\\chi}}{2}\\right) \\right]\n\\]\n\nExample 2\n\n\\[\n\\Gamma_ {k} \\left[ g, \\bar {g} \\right] = \\left(1 6 \\pi G \\left(k\\right)\\right) ^ {- 1} \\int d ^ {4} x \\sqrt {g} \\left\\{- R \\left(g\\right) + 2 \\bar {\\lambda} \\left(k\\right) \\right\\} + S _ {g f} \\left[ g, \\bar {g} \\right]\n\\]\n\nFigure 18: Diffusion decoding examples for formula recognition.",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.136,
+        0.078,
+        0.837,
+        0.096
+      ],
+      "angle": 0,
+      "content": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion Decoding"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.427,
+        0.191,
+        0.572,
+        0.208
+      ],
+      "angle": 0,
+      "content": "Formula Decoding"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.272,
+        0.294,
+        0.353,
+        0.311
+      ],
+      "angle": 0,
+      "content": "Example 1"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.141,
+        0.319,
+        0.487,
+        0.345
+      ],
+      "angle": 0,
+      "content": "\\[\n\\psi_ {R} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ i \\left(\\chi + \\frac {\\sqrt {\\chi}}{2}\\right) \\right], \\quad \\psi_ {L} = a ^ {- 1 / 2} \\frac {1}{\\sqrt {2}} \\exp \\left[ - i \\left(\\chi - \\frac {\\sqrt {\\chi}}{2}\\right) \\right]\n\\]"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.142,
+        0.356,
+        0.487,
+        0.739
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.648,
+        0.303,
+        0.726,
+        0.32
+      ],
+      "angle": 0,
+      "content": "Example 2"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.516,
+        0.328,
+        0.861,
+        0.356
+      ],
+      "angle": 0,
+      "content": "\\[\n\\Gamma_ {k} \\left[ g, \\bar {g} \\right] = \\left(1 6 \\pi G \\left(k\\right)\\right) ^ {- 1} \\int d ^ {4} x \\sqrt {g} \\left\\{- R \\left(g\\right) + 2 \\bar {\\lambda} \\left(k\\right) \\right\\} + S _ {g f} \\left[ g, \\bar {g} \\right]\n\\]"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.513,
+        0.371,
+        0.862,
+        0.731
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.264,
+        0.826,
+        0.735,
+        0.844
+      ],
+      "angle": 0,
+      "content": "Figure 18: Diffusion decoding examples for formula recognition."
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.49,
+        0.938,
+        0.509,
+        0.951
+      ],
+      "angle": 0,
+      "content": "33"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_diffusion_paper_p0033/markdown_1781747319.md"
+}

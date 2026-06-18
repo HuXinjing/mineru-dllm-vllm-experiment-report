@@ -1,0 +1,173 @@
+{
+  "metrics": {
+    "layout_elapsed": 2.3102752990089357,
+    "num_blocks": 14,
+    "num_extracted_blocks": 11,
+    "markdown_chars": 2165,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>135 079 836 094<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>138 128 485 298<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>315 301 337 314<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>505 128 849 290<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>678 299 703 314<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>415 331 585 346<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>166 346 816 392<|box_end|><|ref_start|>image_footnote<|ref_end|><|rotate_up|>\n<|box_start|>162 406 847 528<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>488 537 511 552<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>132 562 863 670<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>134 699 310 719<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>132 731 862 837<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>133 844 862 906<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>493 938 505 950<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "(a)\n\n(b)\n\nMineral-Diffusion\n\nOriginal Image  \nFigure 4: Performance and efficiency scaling of MEM1 (trained on 2-objective QA) with the number of objectives in multi-objective tasks. MEM1 outperforms the other models and baselines while having almost constant scaling in memory usage. Note that at 16-objective, the context of baseline models does not increase anymore since their model performance has degraded (some collapsed).\n\n(c)\n\nFigure 1: (a) The confidence threshold controls decoding parallelism in MinerU-Diffusion. Compared to MinerU2.5, our method achieves up to \\(3.26\\times\\) speedup. (b) MinerU-Diffusion maintains a strong accuracy-efficiency trade-off, achieving \\(2.12\\times\\) speedup with \\(99.9\\%\\) and \\(3.01\\times\\) speedup with \\(98.8\\%\\) relative accuracy. (c) Diffusion decoding progressively reconstructs structured text from masked tokens under visual conditioning: black tokens are confirmed, red tokens are being updated, and yellow tokens remain masked, enabling parallel generation with global consistency, in contrast to autoregressive left-to-right decoding..\n\n1 Introduction\n\nIn recent years, Vision-Language, Models (VLMs) [1, 6, 44, 59, 11, 15, 56, 55, 28] have become the dominant paradigm for document Optical Character Recognition (OCR) [29, 17, 16, 47, 7]. These models encode textual images into visual representations and generate structured text through left-to autoregressive decoding [41], achieving strong performance across benchmarks [32, 9, 42]. Despite architectural unification and scaling, the decoding process remains strictly sequential. This design introduces efficiency and reliability bottlenecks when parsing long documents and complex layouts, particularly in highly structured scenarios such as tables and formulas [32].\n\nFrom the perspective of task formulation, a high-quality OCR system should primarily depend on authentic visual evidence to perform character-level recognition, rather than relying on semantic completion from a language model. However, autoregressive formulations implicitly cast OCR as language-conditioned reconstruction, where textual outputs are generated under strong linguistic",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.135,
+        0.079,
+        0.836,
+        0.094
+      ],
+      "angle": 0,
+      "content": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion Decoding"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.138,
+        0.128,
+        0.485,
+        0.298
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.315,
+        0.301,
+        0.337,
+        0.314
+      ],
+      "angle": 0,
+      "content": "(a)"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.505,
+        0.128,
+        0.849,
+        0.29
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.678,
+        0.299,
+        0.703,
+        0.314
+      ],
+      "angle": 0,
+      "content": "(b)"
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.415,
+        0.331,
+        0.585,
+        0.346
+      ],
+      "angle": 0,
+      "content": "Mineral-Diffusion"
+    },
+    {
+      "type": "image_footnote",
+      "bbox": [
+        0.166,
+        0.346,
+        0.816,
+        0.392
+      ],
+      "angle": 0,
+      "content": "Original Image  \nFigure 4: Performance and efficiency scaling of MEM1 (trained on 2-objective QA) with the number of objectives in multi-objective tasks. MEM1 outperforms the other models and baselines while having almost constant scaling in memory usage. Note that at 16-objective, the context of baseline models does not increase anymore since their model performance has degraded (some collapsed)."
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.162,
+        0.406,
+        0.847,
+        0.528
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.488,
+        0.537,
+        0.511,
+        0.552
+      ],
+      "angle": 0,
+      "content": "(c)"
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.132,
+        0.562,
+        0.863,
+        0.67
+      ],
+      "angle": 0,
+      "content": "Figure 1: (a) The confidence threshold controls decoding parallelism in MinerU-Diffusion. Compared to MinerU2.5, our method achieves up to \\(3.26\\times\\) speedup. (b) MinerU-Diffusion maintains a strong accuracy-efficiency trade-off, achieving \\(2.12\\times\\) speedup with \\(99.9\\%\\) and \\(3.01\\times\\) speedup with \\(98.8\\%\\) relative accuracy. (c) Diffusion decoding progressively reconstructs structured text from masked tokens under visual conditioning: black tokens are confirmed, red tokens are being updated, and yellow tokens remain masked, enabling parallel generation with global consistency, in contrast to autoregressive left-to-right decoding.."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.134,
+        0.699,
+        0.31,
+        0.719
+      ],
+      "angle": 0,
+      "content": "1 Introduction"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.132,
+        0.731,
+        0.862,
+        0.837
+      ],
+      "angle": 0,
+      "content": "In recent years, Vision-Language, Models (VLMs) [1, 6, 44, 59, 11, 15, 56, 55, 28] have become the dominant paradigm for document Optical Character Recognition (OCR) [29, 17, 16, 47, 7]. These models encode textual images into visual representations and generate structured text through left-to autoregressive decoding [41], achieving strong performance across benchmarks [32, 9, 42]. Despite architectural unification and scaling, the decoding process remains strictly sequential. This design introduces efficiency and reliability bottlenecks when parsing long documents and complex layouts, particularly in highly structured scenarios such as tables and formulas [32]."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.133,
+        0.844,
+        0.862,
+        0.906
+      ],
+      "angle": 0,
+      "content": "From the perspective of task formulation, a high-quality OCR system should primarily depend on authentic visual evidence to perform character-level recognition, rather than relying on semantic completion from a language model. However, autoregressive formulations implicitly cast OCR as language-conditioned reconstruction, where textual outputs are generated under strong linguistic"
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.493,
+        0.938,
+        0.505,
+        0.95
+      ],
+      "angle": 0,
+      "content": "3"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_diffusion_paper_p0003/markdown_1781747319.md"
+}

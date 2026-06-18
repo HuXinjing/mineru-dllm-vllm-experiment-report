@@ -1,0 +1,228 @@
+{
+  "metrics": {
+    "layout_elapsed": 3.008728459943086,
+    "num_blocks": 19,
+    "num_extracted_blocks": 17,
+    "markdown_chars": 3057,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>345 094 379 106<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>227 115 578 127<|box_end|><|ref_start|>table_caption<|ref_end|><|rotate_up|>\n<|box_start|>667 094 698 104<|box_end|><|ref_start|>table_caption<|ref_end|><|rotate_up|>\n<|box_start|>599 105 766 143<|box_end|><|ref_start|>table<|ref_end|><|rotate_up|>\n<|box_start|>139 168 620 396<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>623 148 876 321<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>664 322 872 398<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>112 422 882 468<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>114 490 409 506<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>126 517 488 536<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>113 548 491 579<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>186 589 489 624<|box_end|><|ref_start|>equation<|ref_end|><|rotate_up|>\n<|box_start|>114 635 460 669<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>113 678 488 789<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>113 799 489 864<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>113 872 491 920<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>508 490 885 620<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>508 630 883 726<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>507 726 886 924<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>",
+  "markdown": "Query\n\nQuestion: \"Of all song lengths, which one is the longest?\"\n\nTable\n\n<table><tr><td>Title</td><td>Length</td></tr><tr><td>Screwed Up</td><td>5:02</td></tr><tr><td>Ghetto Queen</td><td>5:00</td></tr></table>\n\nLearnable structure enforced attention bias scalars. We use 13 types of attention biases based on task independent relation between header, row, column, text, etc.\n\nFigure 2: TABLEFORMER input and attention biases in the self attention module. This example corresponds to table (a) in Figure 1 and its paired question \"query\". Different colors in the attention bias matrix denote different types of task independent biases derived based on the table structure and the associated text.\n\nsponding representations \\(Q, K\\), and \\(V\\):\n\n\\[\nQ = H W ^ {Q}, \\quad V = H W ^ {V}, \\quad K = H W ^ {K} \\quad (1)\n\\]\n\nThen, the output of this single-head self注意力 sub-layer is calculated as:\n\n\\[\n\\operatorname {A t t n} (H) = \\operatorname {s o f t m a x} (\\frac {Q K ^ {\\top}}{\\sqrt {d _ {K}}}) V \\tag {2}\n\\]\n\n3 TABLEFORMER: Robust Structural Table Encoding\n\nAs shown in Figure 2, TABLEFORMER encodes the general table structure along with the associated text by introducing task-independent relative attention biases for table-text encoding to facilitate the following: (a) structural inductive bias for better table understanding and table-text alignment, (b) robustness to table row/column perturbation.\n\nInput of TABLEFORMER. TABLEFORMER uses the same token embeddings \\( W \\), segment embeddings \\( G \\), and rank embeddings \\( Z \\) as TAPAS. However, we make 2 major modifications:\n\n1) No row or column identities. We do not use row embeddings \\( R \\) or column embeddings \\( C \\) to any potential spurious row and column order biases.\n\n2) Per cell positional ids. To further remove any inter-cell order information, global positional embeddings \\( B \\) are replaced by per cell positional embeddings \\( P = \\{p_{pos_1}, p_{pos_2}, \\dots, p_{pos_n}\\} \\), where we follow Eisenschloser et al. (2021) to reset the index of positional embeddings at the beginning of each cell, and \\( pos_i \\) correspond to the per cell positional id for the \\( i \\)th token.\n\nPositional Encoding in TABLEFORMER. Note that the Transformer model either needs to specify different positions in the input (i.e. absolute positional encoding of Vaswani et al. (2017)) or encode the positional dependency in the layers (i.e. relative positional encoding of Shaw et al. (2018)).\n\nTABLEFORMER does not consume any sort of column and row order information in the input. The main intuition is that, for cells in the table, the only useful positional information is whether two cells are in the same row or column and the column header of each cell, instead of the absolute order of the row and column containing them. Thus, inspired by relative positional encoding (Shaw et al., 2018) and graph encoding (Ying et al., 2021), we capture this with a same column/row relation as one kind of relative position between two linearized tokens. Similarly, we uses 12 such table-text struc",
+  "blocks": [
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.345,
+        0.094,
+        0.379,
+        0.106
+      ],
+      "angle": 0,
+      "content": "Query"
+    },
+    {
+      "type": "table_caption",
+      "bbox": [
+        0.227,
+        0.115,
+        0.578,
+        0.127
+      ],
+      "angle": 0,
+      "content": "Question: \"Of all song lengths, which one is the longest?\""
+    },
+    {
+      "type": "table_caption",
+      "bbox": [
+        0.667,
+        0.094,
+        0.698,
+        0.104
+      ],
+      "angle": 0,
+      "content": "Table"
+    },
+    {
+      "type": "table",
+      "bbox": [
+        0.599,
+        0.105,
+        0.766,
+        0.143
+      ],
+      "angle": 0,
+      "content": "<table><tr><td>Title</td><td>Length</td></tr><tr><td>Screwed Up</td><td>5:02</td></tr><tr><td>Ghetto Queen</td><td>5:00</td></tr></table>"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.139,
+        0.168,
+        0.62,
+        0.396
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.623,
+        0.148,
+        0.876,
+        0.321
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.664,
+        0.322,
+        0.872,
+        0.398
+      ],
+      "angle": 0,
+      "content": "Learnable structure enforced attention bias scalars. We use 13 types of attention biases based on task independent relation between header, row, column, text, etc."
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.112,
+        0.422,
+        0.882,
+        0.468
+      ],
+      "angle": 0,
+      "content": "Figure 2: TABLEFORMER input and attention biases in the self attention module. This example corresponds to table (a) in Figure 1 and its paired question \"query\". Different colors in the attention bias matrix denote different types of task independent biases derived based on the table structure and the associated text."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.114,
+        0.49,
+        0.409,
+        0.506
+      ],
+      "angle": 0,
+      "content": "sponding representations \\(Q, K\\), and \\(V\\):"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.126,
+        0.517,
+        0.488,
+        0.536
+      ],
+      "angle": 0,
+      "content": "\\[\nQ = H W ^ {Q}, \\quad V = H W ^ {V}, \\quad K = H W ^ {K} \\quad (1)\n\\]"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.113,
+        0.548,
+        0.491,
+        0.579
+      ],
+      "angle": 0,
+      "content": "Then, the output of this single-head self注意力 sub-layer is calculated as:"
+    },
+    {
+      "type": "equation",
+      "bbox": [
+        0.186,
+        0.589,
+        0.489,
+        0.624
+      ],
+      "angle": 0,
+      "content": "\\[\n\\operatorname {A t t n} (H) = \\operatorname {s o f t m a x} (\\frac {Q K ^ {\\top}}{\\sqrt {d _ {K}}}) V \\tag {2}\n\\]"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.114,
+        0.635,
+        0.46,
+        0.669
+      ],
+      "angle": 0,
+      "content": "3 TABLEFORMER: Robust Structural Table Encoding"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.113,
+        0.678,
+        0.488,
+        0.789
+      ],
+      "angle": 0,
+      "content": "As shown in Figure 2, TABLEFORMER encodes the general table structure along with the associated text by introducing task-independent relative attention biases for table-text encoding to facilitate the following: (a) structural inductive bias for better table understanding and table-text alignment, (b) robustness to table row/column perturbation."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.113,
+        0.799,
+        0.489,
+        0.864
+      ],
+      "angle": 0,
+      "content": "Input of TABLEFORMER. TABLEFORMER uses the same token embeddings \\( W \\), segment embeddings \\( G \\), and rank embeddings \\( Z \\) as TAPAS. However, we make 2 major modifications:"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.113,
+        0.872,
+        0.491,
+        0.92
+      ],
+      "angle": 0,
+      "content": "1) No row or column identities. We do not use row embeddings \\( R \\) or column embeddings \\( C \\) to any potential spurious row and column order biases."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.508,
+        0.49,
+        0.885,
+        0.62
+      ],
+      "angle": 0,
+      "content": "2) Per cell positional ids. To further remove any inter-cell order information, global positional embeddings \\( B \\) are replaced by per cell positional embeddings \\( P = \\{p_{pos_1}, p_{pos_2}, \\dots, p_{pos_n}\\} \\), where we follow Eisenschloser et al. (2021) to reset the index of positional embeddings at the beginning of each cell, and \\( pos_i \\) correspond to the per cell positional id for the \\( i \\)th token."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.508,
+        0.63,
+        0.883,
+        0.726
+      ],
+      "angle": 0,
+      "content": "Positional Encoding in TABLEFORMER. Note that the Transformer model either needs to specify different positions in the input (i.e. absolute positional encoding of Vaswani et al. (2017)) or encode the positional dependency in the layers (i.e. relative positional encoding of Shaw et al. (2018))."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.507,
+        0.726,
+        0.886,
+        0.924
+      ],
+      "angle": 0,
+      "content": "TABLEFORMER does not consume any sort of column and row order information in the input. The main intuition is that, for cells in the table, the only useful positional information is whether two cells are in the same row or column and the column header of each cell, instead of the absolute order of the row and column containing them. Thus, inspired by relative positional encoding (Shaw et al., 2018) and graph encoding (Ying et al., 2021), we capture this with a same column/row relation as one kind of relative position between two linearized tokens. Similarly, we uses 12 such table-text struc"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_demo3_p0003/markdown_1781747319.md"
+}

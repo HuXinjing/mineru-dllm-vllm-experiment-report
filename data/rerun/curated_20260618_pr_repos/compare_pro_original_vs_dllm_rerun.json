@@ -1,0 +1,710 @@
+{
+  "summary": {
+    "num_cases": 23,
+    "num_matched_ok": 23,
+    "baseline_total_latency_s": 70.78216402803082,
+    "candidate_total_latency_s": 76.1502977302298,
+    "total_speedup": 0.9295060707284936,
+    "mean_speedup": 0.9925145423428207,
+    "mean_markdown_similarity": 0.8774209244529035,
+    "min_markdown_similarity": 0.1266787658802178,
+    "mean_layout_f1": 0.8582555483210887,
+    "min_layout_f1": 0.5294117647058824
+  },
+  "cases": [
+    {
+      "case_id": "mineru_demo1_p0001",
+      "doc_id": "mineru_demo1",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.3836692749755457,
+      "candidate_latency_s": 5.3972798810573295,
+      "speedup": 0.6269212176398536,
+      "markdown_similarity": 0.9839688715953308,
+      "baseline_blocks": 18,
+      "candidate_blocks": 23,
+      "layout_matched_blocks": 15,
+      "layout_precision": 0.6521739130434783,
+      "layout_recall": 0.8333333333333334,
+      "layout_f1": 0.7317073170731708,
+      "baseline_type_counts": {
+        "header": 5,
+        "title": 2,
+        "text": 8,
+        "page_footnote": 2,
+        "footer": 1
+      },
+      "candidate_type_counts": {
+        "header": 9,
+        "title": 3,
+        "text": 7,
+        "page_footnote": 4
+      }
+    },
+    {
+      "case_id": "mineru_demo1_p0002",
+      "doc_id": "mineru_demo1",
+      "page_index": 1,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.5632591580506414,
+      "candidate_latency_s": 2.440755074028857,
+      "speedup": 1.4599003382051405,
+      "markdown_similarity": 0.8879194630872483,
+      "baseline_blocks": 9,
+      "candidate_blocks": 9,
+      "layout_matched_blocks": 7,
+      "layout_precision": 0.7777777777777778,
+      "layout_recall": 0.7777777777777778,
+      "layout_f1": 0.7777777777777778,
+      "baseline_type_counts": {
+        "page_number": 1,
+        "header": 1,
+        "title": 1,
+        "text": 4,
+        "chart": 1,
+        "image_caption": 1
+      },
+      "candidate_type_counts": {
+        "page_number": 1,
+        "title": 2,
+        "text": 4,
+        "image": 1,
+        "image_caption": 1
+      }
+    },
+    {
+      "case_id": "mineru_demo1_p0003",
+      "doc_id": "mineru_demo1",
+      "page_index": 2,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.1741964230313897,
+      "candidate_latency_s": 3.213825359940529,
+      "speedup": 0.9876692313766942,
+      "markdown_similarity": 0.9830047586675731,
+      "baseline_blocks": 12,
+      "candidate_blocks": 12,
+      "layout_matched_blocks": 12,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "header": 1,
+        "page_number": 1,
+        "text": 6,
+        "title": 2,
+        "equation": 2
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "page_number": 1,
+        "text": 6,
+        "title": 2,
+        "equation": 2
+      }
+    },
+    {
+      "case_id": "mineru_demo2_p0001",
+      "doc_id": "mineru_demo2",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.1615558339981362,
+      "candidate_latency_s": 3.2388548819581047,
+      "speedup": 0.9761338340934756,
+      "markdown_similarity": 0.9826178010471204,
+      "baseline_blocks": 16,
+      "candidate_blocks": 17,
+      "layout_matched_blocks": 15,
+      "layout_precision": 0.8823529411764706,
+      "layout_recall": 0.9375,
+      "layout_f1": 0.9090909090909091,
+      "baseline_type_counts": {
+        "title": 3,
+        "text": 10,
+        "image": 1,
+        "image_caption": 1,
+        "footer": 1
+      },
+      "candidate_type_counts": {
+        "title": 3,
+        "text": 11,
+        "image": 1,
+        "image_caption": 1,
+        "footer": 1
+      }
+    },
+    {
+      "case_id": "mineru_demo2_p0002",
+      "doc_id": "mineru_demo2",
+      "page_index": 1,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.510487445979379,
+      "candidate_latency_s": 3.208069807034917,
+      "speedup": 1.0942677862811139,
+      "markdown_similarity": 0.9915379240742178,
+      "baseline_blocks": 16,
+      "candidate_blocks": 16,
+      "layout_matched_blocks": 16,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "text": 11,
+        "title": 2,
+        "equation": 3
+      },
+      "candidate_type_counts": {
+        "text": 11,
+        "title": 2,
+        "equation": 3
+      }
+    },
+    {
+      "case_id": "mineru_demo2_p0003",
+      "doc_id": "mineru_demo2",
+      "page_index": 2,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 4.238802156993188,
+      "candidate_latency_s": 4.11847476195544,
+      "speedup": 1.0292164944530622,
+      "markdown_similarity": 0.9648667767036077,
+      "baseline_blocks": 21,
+      "candidate_blocks": 21,
+      "layout_matched_blocks": 21,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "text": 11,
+        "title": 4,
+        "equation": 6
+      },
+      "candidate_type_counts": {
+        "text": 11,
+        "title": 4,
+        "equation": 6
+      }
+    },
+    {
+      "case_id": "mineru_demo3_p0001",
+      "doc_id": "mineru_demo3",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.302951425081119,
+      "candidate_latency_s": 5.738295880961232,
+      "speedup": 0.5755979638554009,
+      "markdown_similarity": 0.965483476132191,
+      "baseline_blocks": 27,
+      "candidate_blocks": 32,
+      "layout_matched_blocks": 26,
+      "layout_precision": 0.8125,
+      "layout_recall": 0.9629629629629629,
+      "layout_f1": 0.8813559322033898,
+      "baseline_type_counts": {
+        "aside_text": 1,
+        "title": 3,
+        "text": 18,
+        "page_footnote": 2,
+        "list": 1,
+        "table": 2
+      },
+      "candidate_type_counts": {
+        "title": 3,
+        "text": 23,
+        "page_footnote": 2,
+        "list": 1,
+        "table": 2,
+        "aside_text": 1
+      }
+    },
+    {
+      "case_id": "mineru_demo3_p0002",
+      "doc_id": "mineru_demo3",
+      "page_index": 1,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.065127370064147,
+      "candidate_latency_s": 4.457025162060745,
+      "speedup": 0.6877069925822358,
+      "markdown_similarity": 0.9182925621471725,
+      "baseline_blocks": 21,
+      "candidate_blocks": 21,
+      "layout_matched_blocks": 15,
+      "layout_precision": 0.7142857142857143,
+      "layout_recall": 0.7142857142857143,
+      "layout_f1": 0.7142857142857143,
+      "baseline_type_counts": {
+        "text": 13,
+        "list": 1,
+        "title": 1,
+        "equation": 6
+      },
+      "candidate_type_counts": {
+        "text": 19,
+        "list": 1,
+        "title": 1
+      }
+    },
+    {
+      "case_id": "mineru_demo3_p0003",
+      "doc_id": "mineru_demo3",
+      "page_index": 2,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.75155690102838,
+      "candidate_latency_s": 4.368378725950606,
+      "speedup": 0.8587984550748861,
+      "markdown_similarity": 0.4614081165805304,
+      "baseline_blocks": 13,
+      "candidate_blocks": 19,
+      "layout_matched_blocks": 12,
+      "layout_precision": 0.631578947368421,
+      "layout_recall": 0.9230769230769231,
+      "layout_f1": 0.7499999999999999,
+      "baseline_type_counts": {
+        "image": 1,
+        "image_caption": 1,
+        "text": 8,
+        "equation": 2,
+        "title": 1
+      },
+      "candidate_type_counts": {
+        "header": 3,
+        "table": 3,
+        "table_footnote": 1,
+        "image_caption": 1,
+        "text": 8,
+        "equation": 2,
+        "title": 1
+      }
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0001",
+      "doc_id": "mineru_diffusion_paper",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 2.489934255951084,
+      "candidate_latency_s": 3.452845891006291,
+      "speedup": 0.7211252209189744,
+      "markdown_similarity": 0.9742198100407056,
+      "baseline_blocks": 14,
+      "candidate_blocks": 14,
+      "layout_matched_blocks": 14,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "header": 4,
+        "title": 1,
+        "text": 8,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "header": 4,
+        "title": 1,
+        "text": 8,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0002",
+      "doc_id": "mineru_diffusion_paper",
+      "page_index": 1,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 5.757913540001027,
+      "candidate_latency_s": 7.785234718001448,
+      "speedup": 0.7395940840020229,
+      "markdown_similarity": 0.7255200405885337,
+      "baseline_blocks": 58,
+      "candidate_blocks": 54,
+      "layout_matched_blocks": 48,
+      "layout_precision": 0.8888888888888888,
+      "layout_recall": 0.8275862068965517,
+      "layout_f1": 0.8571428571428572,
+      "baseline_type_counts": {
+        "header": 1,
+        "title": 1,
+        "text": 43,
+        "list": 12,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "title": 7,
+        "text": 37,
+        "list": 8,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0003",
+      "doc_id": "mineru_diffusion_paper",
+      "page_index": 2,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.473057502997108,
+      "candidate_latency_s": 3.6646723659941927,
+      "speedup": 0.9477129620712761,
+      "markdown_similarity": 0.9223679546260192,
+      "baseline_blocks": 15,
+      "candidate_blocks": 19,
+      "layout_matched_blocks": 9,
+      "layout_precision": 0.47368421052631576,
+      "layout_recall": 0.6,
+      "layout_f1": 0.5294117647058824,
+      "baseline_type_counts": {
+        "header": 1,
+        "chart": 2,
+        "image_caption": 5,
+        "title": 2,
+        "text": 3,
+        "image": 1,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "image": 2,
+        "image_caption": 5,
+        "image_footnote": 7,
+        "title": 1,
+        "text": 2,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0006",
+      "doc_id": "mineru_diffusion_paper",
+      "page_index": 5,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 3.2968919900013134,
+      "candidate_latency_s": 2.1117695450084284,
+      "speedup": 1.5611987575984079,
+      "markdown_similarity": 0.8594722798695523,
+      "baseline_blocks": 9,
+      "candidate_blocks": 9,
+      "layout_matched_blocks": 9,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "header": 1,
+        "image": 1,
+        "image_caption": 1,
+        "text": 4,
+        "title": 1,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "image": 1,
+        "image_caption": 1,
+        "text": 4,
+        "title": 1,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0011",
+      "doc_id": "mineru_diffusion_paper",
+      "page_index": 10,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 5.457719909958541,
+      "candidate_latency_s": 3.8341642430750653,
+      "speedup": 1.423444475498357,
+      "markdown_similarity": 0.9908105127733873,
+      "baseline_blocks": 12,
+      "candidate_blocks": 12,
+      "layout_matched_blocks": 11,
+      "layout_precision": 0.9166666666666666,
+      "layout_recall": 0.9166666666666666,
+      "layout_f1": 0.9166666666666666,
+      "baseline_type_counts": {
+        "header": 1,
+        "table": 1,
+        "table_caption": 1,
+        "title": 5,
+        "text": 3,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "table": 1,
+        "table_footnote": 1,
+        "title": 5,
+        "text": 3,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0021",
+      "doc_id": "mineru_diffusion_paper",
+      "page_index": 20,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 2.5119549399241805,
+      "candidate_latency_s": 2.4739243449876085,
+      "speedup": 1.015372577990764,
+      "markdown_similarity": 0.9884953072963972,
+      "baseline_blocks": 13,
+      "candidate_blocks": 13,
+      "layout_matched_blocks": 13,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "header": 1,
+        "text": 7,
+        "title": 4,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "text": 7,
+        "title": 4,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "mineru_diffusion_paper_p0033",
+      "doc_id": "mineru_diffusion_paper",
+      "page_index": 32,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 5.058167818002403,
+      "candidate_latency_s": 2.2229505860013887,
+      "speedup": 2.275429714837234,
+      "markdown_similarity": 0.1266787658802178,
+      "baseline_blocks": 8,
+      "candidate_blocks": 10,
+      "layout_matched_blocks": 5,
+      "layout_precision": 0.5,
+      "layout_recall": 0.625,
+      "layout_f1": 0.5555555555555556,
+      "baseline_type_counts": {
+        "header": 1,
+        "title": 1,
+        "image_caption": 3,
+        "table": 1,
+        "image": 1,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "title": 3,
+        "equation": 2,
+        "image": 2,
+        "image_caption": 1,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "mineru_small_ocr_p0001",
+      "doc_id": "mineru_small_ocr",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 2.3423323470633477,
+      "candidate_latency_s": 3.45986838103272,
+      "speedup": 0.6770004199882874,
+      "markdown_similarity": 0.48928571428571427,
+      "baseline_blocks": 11,
+      "candidate_blocks": 10,
+      "layout_matched_blocks": 6,
+      "layout_precision": 0.6,
+      "layout_recall": 0.5454545454545454,
+      "layout_f1": 0.5714285714285713,
+      "baseline_type_counts": {
+        "page_number": 1,
+        "header": 1,
+        "text": 4,
+        "page_footnote": 4,
+        "list": 1
+      },
+      "candidate_type_counts": {
+        "page_number": 1,
+        "header": 1,
+        "text": 7,
+        "list": 1
+      }
+    },
+    {
+      "case_id": "mineru_small_ocr_p0002",
+      "doc_id": "mineru_small_ocr",
+      "page_index": 1,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 2.2344216909259558,
+      "candidate_latency_s": 3.31046705506742,
+      "speedup": 0.6749566311211789,
+      "markdown_similarity": 0.9885535900104059,
+      "baseline_blocks": 11,
+      "candidate_blocks": 11,
+      "layout_matched_blocks": 11,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "header": 1,
+        "page_number": 1,
+        "text": 5,
+        "page_footnote": 4
+      },
+      "candidate_type_counts": {
+        "header": 1,
+        "page_number": 1,
+        "text": 5,
+        "page_footnote": 4
+      }
+    },
+    {
+      "case_id": "mineru_small_ocr_p0003",
+      "doc_id": "mineru_small_ocr",
+      "page_index": 2,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 2.2703628769377246,
+      "candidate_latency_s": 2.4117362319957465,
+      "speedup": 0.9413810875408073,
+      "markdown_similarity": 0.9982046678635548,
+      "baseline_blocks": 6,
+      "candidate_blocks": 6,
+      "layout_matched_blocks": 6,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "page_number": 1,
+        "header": 1,
+        "text": 3,
+        "page_footnote": 1
+      },
+      "candidate_type_counts": {
+        "page_number": 1,
+        "header": 1,
+        "text": 3,
+        "page_footnote": 1
+      }
+    },
+    {
+      "case_id": "mineru_unit_test_p0001",
+      "doc_id": "mineru_unit_test",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 1.8762633800506592,
+      "candidate_latency_s": 1.8157521389657632,
+      "speedup": 1.0333257165371497,
+      "markdown_similarity": 0.9892617449664429,
+      "baseline_blocks": 15,
+      "candidate_blocks": 7,
+      "layout_matched_blocks": 6,
+      "layout_precision": 0.8571428571428571,
+      "layout_recall": 0.4,
+      "layout_f1": 0.5454545454545455,
+      "baseline_type_counts": {
+        "image_block": 1,
+        "image": 8,
+        "image_caption": 1,
+        "equation": 1,
+        "text": 1,
+        "table_caption": 1,
+        "table": 1,
+        "page_number": 1
+      },
+      "candidate_type_counts": {
+        "image": 1,
+        "image_caption": 1,
+        "equation": 1,
+        "text": 1,
+        "table_caption": 1,
+        "table": 1,
+        "page_number": 1
+      }
+    },
+    {
+      "case_id": "ragflow_doc1_p0001",
+      "doc_id": "ragflow_doc1",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 0.9297255420824513,
+      "candidate_latency_s": 1.0769732750486583,
+      "speedup": 0.8632763352836641,
+      "markdown_similarity": 1.0,
+      "baseline_blocks": 4,
+      "candidate_blocks": 4,
+      "layout_matched_blocks": 4,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "title": 1,
+        "text": 3
+      },
+      "candidate_type_counts": {
+        "title": 1,
+        "text": 3
+      }
+    },
+    {
+      "case_id": "ragflow_doc2_p0001",
+      "doc_id": "ragflow_doc2",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 0.9381220720242709,
+      "candidate_latency_s": 1.0524058820446953,
+      "speedup": 0.8914070968527988,
+      "markdown_similarity": 0.9958693203154337,
+      "baseline_blocks": 4,
+      "candidate_blocks": 4,
+      "layout_matched_blocks": 4,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "title": 1,
+        "text": 3
+      },
+      "candidate_type_counts": {
+        "title": 1,
+        "text": 3
+      }
+    },
+    {
+      "case_id": "ragflow_doc3_p0001",
+      "doc_id": "ragflow_doc3",
+      "page_index": 0,
+      "baseline_ok": true,
+      "candidate_ok": true,
+      "baseline_latency_s": 0.9936901729088277,
+      "candidate_latency_s": 1.296573537052609,
+      "speedup": 0.7663970800820904,
+      "markdown_similarity": 0.9928418038654259,
+      "baseline_blocks": 5,
+      "candidate_blocks": 5,
+      "layout_matched_blocks": 5,
+      "layout_precision": 1.0,
+      "layout_recall": 1.0,
+      "layout_f1": 1.0,
+      "baseline_type_counts": {
+        "title": 1,
+        "text": 4
+      },
+      "candidate_type_counts": {
+        "title": 1,
+        "text": 4
+      }
+    }
+  ]
+}

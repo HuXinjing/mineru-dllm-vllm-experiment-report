@@ -1,0 +1,159 @@
+{
+  "metrics": {
+    "layout_elapsed": 1.151431155973114,
+    "extract_elapsed": 1.1838424949673936,
+    "total_elapsed": 2.4739243449876085,
+    "num_blocks": 13,
+    "num_extracted_blocks": 13,
+    "markdown_chars": 3336,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>139 079 837 095<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>135 128 867 159<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>134 177 492 196<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>133 203 863 278<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>130 286 865 349<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>134 365 360 385<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>130 392 866 485<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>134 502 366 521<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>133 527 865 633<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>133 641 865 719<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>134 737 324 755<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>135 762 869 838<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>490 939 509 950<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "improve training stability. All parameters are updated in this phase. The sequence length is 12288, the batch size is 256, the learning rate is \\(4\\times 10^{-5}\\) , and training lasts for9 epochs.\n\nA.3 Stage-2: Hard-Case Specialization\n\nStage-2 starts from the Stage-1 checkpoint and shifts the sampling distribution toward the harder subset \\(\\mathcal{D}_{\\mathrm{hard}}\\). This subset contains samples on which the model remains comparatively unstable, including crowded layouts, ambiguous crop boundaries, structurally complex tables, and noisy supervision. Hard samples are mixed with a smaller replay portion drawn from the broader Stage-1 distribution, so that baseline OCR coverage is preserved while failure cases are further reduced.\n\nThis phase is intended to improve performance on the samples that dominate the residual error after Stage-1. Accordingly, the sequence length is increased to 16384 and the learning rate is reduced to \\(2 \\times 10^{-5}\\), while the batch size is kept at 256 and the warmup ratio is increased to 0.1. All parameters remain trainableable, and fine-tuning lasts for 4 epochs.\n\nA.4 Training Dynamics\n\nAs shown in Figure 8, the loss and gradient norm remain stable throughout Stage 0a, Stage 0b, Stage 1, and Stage 2. Stage 0a and Stage 0b converge rapidly during multimodal initialization, Stage 1 exhibits smooth long-hospital optimization on \\( \\mathcal{D}_{\\mathrm{base}} \\), and Stage 2 remains stable after introducing hard-case refinement. These dynamics are consistent with the curriculum design: a stable base solution is first established on broad OCR data, after which hard-case refinement improves performance while preserving preserving optimization stability.\n\nA.5 Data Augmentation\n\nDocument-specific augmentation is enabled in both Stage-1 and Stage-2. Following the same augmentation taxonomy used in MinerU2.5, we inject four types of perturbations during OCR training: geometric changes, background disturbances, color shifts, and image degradation. In practice, this includes scaling, grid distortion, and rotation; background effects such as texture overlays, a weather-like artifacts, watermarking, scanlines, and shadows; photometric changes such as brightness/contrast adjustment, illumination variation, and RGB shift; and degradation operators including PSF blur, motion-like blur, Gaussian blur, and light morphological corruption such as erosion or dilation.\n\nThese transformations target common OCR noise. We mainly simulate uneven lighting, compression artifacts, scan traces, and cluttered backgrounds. As in MinerU2.5, spatial augmentation is not applied to layout detection samples, since it can alter the geometric supervision itself. Augmentation strength and sampling probability are instead tuned by task type, so that the model gains robustness without drifting too far from valid OCR targets.\n\nA.6 Practical Notes\n\nFor Stage-1 and Stage-2, the visual token budget is limited to 2048 tokens per image, and inputs are resized only when this budget is exceeded. Page-level layout detection and crop-level recognition are trained separately within the same unified model. This design aligns training with downstream usage: global structure is learned from full pages, whereas precise transcription and structure recovery are learned from native-content regions.",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.139,
+        0.079,
+        0.837,
+        0.095
+      ],
+      "angle": 0,
+      "content": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion, Decoding"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.135,
+        0.128,
+        0.867,
+        0.159
+      ],
+      "angle": 0,
+      "content": "improve training stability. All parameters are updated in this phase. The sequence length is 12288, the batch size is 256, the learning rate is \\(4\\times 10^{-5}\\) , and training lasts for9 epochs."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.134,
+        0.177,
+        0.492,
+        0.196
+      ],
+      "angle": 0,
+      "content": "A.3 Stage-2: Hard-Case Specialization"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.133,
+        0.203,
+        0.863,
+        0.278
+      ],
+      "angle": 0,
+      "content": "Stage-2 starts from the Stage-1 checkpoint and shifts the sampling distribution toward the harder subset \\(\\mathcal{D}_{\\mathrm{hard}}\\). This subset contains samples on which the model remains comparatively unstable, including crowded layouts, ambiguous crop boundaries, structurally complex tables, and noisy supervision. Hard samples are mixed with a smaller replay portion drawn from the broader Stage-1 distribution, so that baseline OCR coverage is preserved while failure cases are further reduced."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.13,
+        0.286,
+        0.865,
+        0.349
+      ],
+      "angle": 0,
+      "content": "This phase is intended to improve performance on the samples that dominate the residual error after Stage-1. Accordingly, the sequence length is increased to 16384 and the learning rate is reduced to \\(2 \\times 10^{-5}\\), while the batch size is kept at 256 and the warmup ratio is increased to 0.1. All parameters remain trainableable, and fine-tuning lasts for 4 epochs."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.134,
+        0.365,
+        0.36,
+        0.385
+      ],
+      "angle": 0,
+      "content": "A.4 Training Dynamics"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.13,
+        0.392,
+        0.866,
+        0.485
+      ],
+      "angle": 0,
+      "content": "As shown in Figure 8, the loss and gradient norm remain stable throughout Stage 0a, Stage 0b, Stage 1, and Stage 2. Stage 0a and Stage 0b converge rapidly during multimodal initialization, Stage 1 exhibits smooth long-hospital optimization on \\( \\mathcal{D}_{\\mathrm{base}} \\), and Stage 2 remains stable after introducing hard-case refinement. These dynamics are consistent with the curriculum design: a stable base solution is first established on broad OCR data, after which hard-case refinement improves performance while preserving preserving optimization stability."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.134,
+        0.502,
+        0.366,
+        0.521
+      ],
+      "angle": 0,
+      "content": "A.5 Data Augmentation"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.133,
+        0.527,
+        0.865,
+        0.633
+      ],
+      "angle": 0,
+      "content": "Document-specific augmentation is enabled in both Stage-1 and Stage-2. Following the same augmentation taxonomy used in MinerU2.5, we inject four types of perturbations during OCR training: geometric changes, background disturbances, color shifts, and image degradation. In practice, this includes scaling, grid distortion, and rotation; background effects such as texture overlays, a weather-like artifacts, watermarking, scanlines, and shadows; photometric changes such as brightness/contrast adjustment, illumination variation, and RGB shift; and degradation operators including PSF blur, motion-like blur, Gaussian blur, and light morphological corruption such as erosion or dilation."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.133,
+        0.641,
+        0.865,
+        0.719
+      ],
+      "angle": 0,
+      "content": "These transformations target common OCR noise. We mainly simulate uneven lighting, compression artifacts, scan traces, and cluttered backgrounds. As in MinerU2.5, spatial augmentation is not applied to layout detection samples, since it can alter the geometric supervision itself. Augmentation strength and sampling probability are instead tuned by task type, so that the model gains robustness without drifting too far from valid OCR targets."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.134,
+        0.737,
+        0.324,
+        0.755
+      ],
+      "angle": 0,
+      "content": "A.6 Practical Notes"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.135,
+        0.762,
+        0.869,
+        0.838
+      ],
+      "angle": 0,
+      "content": "For Stage-1 and Stage-2, the visual token budget is limited to 2048 tokens per image, and inputs are resized only when this budget is exceeded. Page-level layout detection and crop-level recognition are trained separately within the same unified model. This design aligns training with downstream usage: global structure is learned from full pages, whereas precise transcription and structure recovery are learned from native-content regions."
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.49,
+        0.939,
+        0.509,
+        0.95
+      ],
+      "angle": 0,
+      "content": "21"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_diffusion_paper_p0021/markdown_1781747555.md"
+}

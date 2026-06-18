@@ -1,0 +1,63 @@
+{
+  "metrics": {
+    "layout_elapsed": 0.7797590850386769,
+    "num_blocks": 4,
+    "num_extracted_blocks": 4,
+    "markdown_chars": 1255,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>320 086 680 110<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>106 127 894 197<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>108 226 894 297<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>108 324 895 430<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>",
+  "markdown": "PDF 1: Purpose of RAGFlow\n\nRAGFlow is an open source Retrieval-Augmented Generation (RAG) engine designed to turn raw documents into reliable context for large language models. Its purpose is to make it practical to build an AI assistant that can answer questions using your private files, while staying grounded in the source material.\n\nIn a typical workflow, you ingest documents into a dataset, the system parses and cleans them, then chunks and indexes the content for search. At question time, RAGFlow retrieves the most relevant passages and sends them to the model as context. This reduces hallucinations and improves traceability because answers can be tied back to specific excerpts, often with citations.\n\nRAGFlow focuses on deep document understanding, so it can handle complex formats beyond plain text, such as PDFs with tables, images, and mixed layouts. It provides an end-to-end pipeline: data ingestion, retrieval, chat, and agent style orchestration. It also exposes user interfaces and APIs so teams can experiment quickly, then operationalize the same flows in production. For a parsing test, the key idea is that the platform converts heterogeneous files into structured text chunks that are ready for retrieval, ranking, and quoting.",
+  "blocks": [
+    {
+      "type": "title",
+      "bbox": [
+        0.32,
+        0.086,
+        0.68,
+        0.11
+      ],
+      "angle": 0,
+      "content": "PDF 1: Purpose of RAGFlow"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.106,
+        0.127,
+        0.894,
+        0.197
+      ],
+      "angle": 0,
+      "content": "RAGFlow is an open source Retrieval-Augmented Generation (RAG) engine designed to turn raw documents into reliable context for large language models. Its purpose is to make it practical to build an AI assistant that can answer questions using your private files, while staying grounded in the source material."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.108,
+        0.226,
+        0.894,
+        0.297
+      ],
+      "angle": 0,
+      "content": "In a typical workflow, you ingest documents into a dataset, the system parses and cleans them, then chunks and indexes the content for search. At question time, RAGFlow retrieves the most relevant passages and sends them to the model as context. This reduces hallucinations and improves traceability because answers can be tied back to specific excerpts, often with citations."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.108,
+        0.324,
+        0.895,
+        0.43
+      ],
+      "angle": 0,
+      "content": "RAGFlow focuses on deep document understanding, so it can handle complex formats beyond plain text, such as PDFs with tables, images, and mixed layouts. It provides an end-to-end pipeline: data ingestion, retrieval, chat, and agent style orchestration. It also exposes user interfaces and APIs so teams can experiment quickly, then operationalize the same flows in production. For a parsing test, the key idea is that the platform converts heterogeneous files into structured text chunks that are ready for retrieval, ranking, and quoting."
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/ragflow_doc1_p0001/markdown_1781747319.md"
+}

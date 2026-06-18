@@ -1,0 +1,250 @@
+{
+  "metrics": {
+    "layout_elapsed": 2.514478523982689,
+    "num_blocks": 21,
+    "num_extracted_blocks": 21,
+    "markdown_chars": 5047,
+    "content_concurrency": 4,
+    "layout_concurrency": 4,
+    "throughput_batch_size": 23,
+    "throughput_wall_elapsed_s": 45.120288330945186,
+    "throughput_layout_wall_elapsed_s": 13.921409289934672,
+    "throughput_extract_wall_elapsed_s": 31.198874311055988
+  },
+  "layout_output": "<|box_start|>112 085 490 213<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>113 214 487 327<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>112 329 492 617<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>112 619 490 747<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>136 762 492 811<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>136 826 490 873<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>136 888 490 921<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>136 762 492 921<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>546 085 885 115<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>509 132 813 166<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>508 177 885 351<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>508 354 883 481<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>509 484 884 548<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>536 562 827 580<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>508 582 789 598<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>522 602 852 620<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>526 621 843 639<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>553 643 863 659<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>551 661 882 679<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>509 694 881 741<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>508 742 885 919<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>",
+  "markdown": "the model gives the correct length \"5:02\" as answer. This probing example shows that the model being aware of row order information is inclined to select length values to the end of the table due to spurious training data bias. In our experiments on the SQQA dataset, TAPAS models exhibit a \\(4\\%\\) - \\(6\\%\\) (Section 5.2) absolute performance drop when facing such answer-invariant perturbations.\n\nBesides, most prior work (Chen et al., 2020; Yin et al., 2020) did not incorporate enough structural biases to models to address the limitation of sequential Transformer architecture, while others inductive biases which are either too strict (Zhang et al., 2020; Eisenschlos et al., 2021) or computationally expensive (Yin et al., 2020).\n\nTo this end, we propose TABLEFORMER, a Transformer architecture that is robust to row and column order perturbations, by incorporating structural biases more naturally. TABLEFORMER relies on 13 types of task-independent table-text attention biases that respect the table structure and table-text relations. For Question (a) in Figure 1, TABLEFORMER could predict the correct answer regardless of perturbation, because the model could identify the same row information with our \"same row\" bias, avoiding spurious biases introduced by row and global positional embeddings. For Question (b), TLAS predicted only partially correct answer, while TABLEFORMER could correctly predict \"Spain, Ukraine\" as answers. That's because our \"cell to sentence\" bias could help table cells ground to the paired sentence. Detailed attention bias types are discussed in Section 5.2.\n\nExperiments on 3 table reasoning datasets show that TABLEFORMER consistently outperforms original TAAS in all pretraining and intermediate pretraining settings with fewer parameters. Also, TABLEFORMER's invariance to row and column perturbations, leads to even larger improvement over those strong baselines when tested on perturbations. Our contributions are as follows:\n\nWe identified the limitation of current table-text encoding models when facing row or column perturbation.\n\n- We propose TABLEFORMER, which is guaranteed to be invariant to row and column order perturbations, unlike current models.\n\n- TABLEFORMER encodes table-text structures better, leading to SoTA performance on SQA\n\n- We identified the limitation of current table-text encoding models when facing row or column perturbation.  \n- We propose TABLEFORMER, which is guaranteed to be invariant to row and column order perturbations, unlike current models.  \n- TABLEFORMER encodes table-text structures better, leading to SoTA performance on SQA\n\ndataset, and ablation studies show the effectiveness of the introduced inductive biases.\n\n2 Preliminaries: TAPAS for Table Encoding\n\nIn this section, we discuss TAPAS which serves as the backbone of the recent state-of-the-art table-text encoding architectures. TAPAS (Herzig et al., 2020) uses Transformer architecture in a BERT like fashion to pretrain and finetune on tabular data for table-text understanding tasks. This is achieved by using linearized table and texts for masked language model pre-training. In the finetuning stage, texts in the linearized table and text pairs are queries or statements in table QA or table-text entailment tasks, respectively.\n\nSpecifically, TAPAS uses the tokenized and flattened text and table as input, separated by [SEP] token, and prefixedixed by [CLS]. Besides token, segment, and global positional embedding introduced in BERT (Devlin et al., 2019), it also uses rank embedding for better numerical understanding. Moreover, it uses column and row embedding to encode table structures.\n\nConcretely, for any table-text linearized sequence \\( S = \\{v_{1}, v_{2}, \\dots, v_{n}\\} \\), where \\( n \\) is the length of table-text sequence, the input to TAPAS is summation of embedding of the following:\n\ntoken ids \\((W) = \\{w_{v1}, w_{v2}, \\dots, w_{v_n}\\}\\)\n\npositional ids \\((B) = \\{b_1,b_2,\\dots ,b_n\\}\\)\n\nsegment ids \\((G) = \\{g_{seg_1}, g_{seg_2}, \\dots, g_{seg_n}\\}\\)\n\ncolumn iDs \\((C) = \\{c_{col_1}, c_{col_2}, \\dots, c_{col_n}\\}\\)\n\nrow ids (R) = {row1, row2, ., rown}\n\nrank ids (Z) = \\{z_{rank_1}, z_{rank_2}, \\dots, z_{rank_n}\\}\n\nwhere \\( seg_i \\), \\( col_i \\), \\( row_i \\), \\( rank_i \\) correspond to the segment, column, row, and \\( rank_i \\) for the \\( i \\) ith token, respectively.\n\nAs for the model, TAPAS uses BERT's self-attention architecture ( Vaswani et al., 2017) off-the-shelf. Each Transformer layer includes a multi-head self-attention sub-layer, where each token attends to all the tokens. Let the layer input \\( H = [h_1, h_2, \\dots, h_n]^\\top \\in \\mathbb{R}^{n \\times d} \\) corresponding to \\( S \\), where \\( d \\) is the hidden dimension, and \\( h_i \\in \\mathbb{R}^{d \\times 1} \\) is the hidden representation at position \\( i \\). For a single-head self-attention sub-layer, the input \\( H \\) is projected by three matrices \\( W^Q \\in \\mathbb{R}^{d \\times d_K} \\), \\( W^K \\in \\mathbb{R}^{d \\times d_K} \\), and \\( W^V \\in \\mathbb{R}^{d \\times d_V} \\) to the corre",
+  "blocks": [
+    {
+      "type": "text",
+      "bbox": [
+        0.112,
+        0.085,
+        0.49,
+        0.213
+      ],
+      "angle": 0,
+      "content": "the model gives the correct length \"5:02\" as answer. This probing example shows that the model being aware of row order information is inclined to select length values to the end of the table due to spurious training data bias. In our experiments on the SQQA dataset, TAPAS models exhibit a \\(4\\%\\) - \\(6\\%\\) (Section 5.2) absolute performance drop when facing such answer-invariant perturbations."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.113,
+        0.214,
+        0.487,
+        0.327
+      ],
+      "angle": 0,
+      "content": "Besides, most prior work (Chen et al., 2020; Yin et al., 2020) did not incorporate enough structural biases to models to address the limitation of sequential Transformer architecture, while others inductive biases which are either too strict (Zhang et al., 2020; Eisenschlos et al., 2021) or computationally expensive (Yin et al., 2020)."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.112,
+        0.329,
+        0.492,
+        0.617
+      ],
+      "angle": 0,
+      "content": "To this end, we propose TABLEFORMER, a Transformer architecture that is robust to row and column order perturbations, by incorporating structural biases more naturally. TABLEFORMER relies on 13 types of task-independent table-text attention biases that respect the table structure and table-text relations. For Question (a) in Figure 1, TABLEFORMER could predict the correct answer regardless of perturbation, because the model could identify the same row information with our \"same row\" bias, avoiding spurious biases introduced by row and global positional embeddings. For Question (b), TLAS predicted only partially correct answer, while TABLEFORMER could correctly predict \"Spain, Ukraine\" as answers. That's because our \"cell to sentence\" bias could help table cells ground to the paired sentence. Detailed attention bias types are discussed in Section 5.2."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.112,
+        0.619,
+        0.49,
+        0.747
+      ],
+      "angle": 0,
+      "content": "Experiments on 3 table reasoning datasets show that TABLEFORMER consistently outperforms original TAAS in all pretraining and intermediate pretraining settings with fewer parameters. Also, TABLEFORMER's invariance to row and column perturbations, leads to even larger improvement over those strong baselines when tested on perturbations. Our contributions are as follows:"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.136,
+        0.762,
+        0.492,
+        0.811
+      ],
+      "angle": 0,
+      "content": "We identified the limitation of current table-text encoding models when facing row or column perturbation."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.136,
+        0.826,
+        0.49,
+        0.873
+      ],
+      "angle": 0,
+      "content": "- We propose TABLEFORMER, which is guaranteed to be invariant to row and column order perturbations, unlike current models."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.136,
+        0.888,
+        0.49,
+        0.921
+      ],
+      "angle": 0,
+      "content": "- TABLEFORMER encodes table-text structures better, leading to SoTA performance on SQA"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.136,
+        0.762,
+        0.492,
+        0.921
+      ],
+      "angle": 0,
+      "content": "- We identified the limitation of current table-text encoding models when facing row or column perturbation.  \n- We propose TABLEFORMER, which is guaranteed to be invariant to row and column order perturbations, unlike current models.  \n- TABLEFORMER encodes table-text structures better, leading to SoTA performance on SQA"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.546,
+        0.085,
+        0.885,
+        0.115
+      ],
+      "angle": 0,
+      "content": "dataset, and ablation studies show the effectiveness of the introduced inductive biases."
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.509,
+        0.132,
+        0.813,
+        0.166
+      ],
+      "angle": 0,
+      "content": "2 Preliminaries: TAPAS for Table Encoding"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.508,
+        0.177,
+        0.885,
+        0.351
+      ],
+      "angle": 0,
+      "content": "In this section, we discuss TAPAS which serves as the backbone of the recent state-of-the-art table-text encoding architectures. TAPAS (Herzig et al., 2020) uses Transformer architecture in a BERT like fashion to pretrain and finetune on tabular data for table-text understanding tasks. This is achieved by using linearized table and texts for masked language model pre-training. In the finetuning stage, texts in the linearized table and text pairs are queries or statements in table QA or table-text entailment tasks, respectively."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.508,
+        0.354,
+        0.883,
+        0.481
+      ],
+      "angle": 0,
+      "content": "Specifically, TAPAS uses the tokenized and flattened text and table as input, separated by [SEP] token, and prefixedixed by [CLS]. Besides token, segment, and global positional embedding introduced in BERT (Devlin et al., 2019), it also uses rank embedding for better numerical understanding. Moreover, it uses column and row embedding to encode table structures."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.509,
+        0.484,
+        0.884,
+        0.548
+      ],
+      "angle": 0,
+      "content": "Concretely, for any table-text linearized sequence \\( S = \\{v_{1}, v_{2}, \\dots, v_{n}\\} \\), where \\( n \\) is the length of table-text sequence, the input to TAPAS is summation of embedding of the following:"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.536,
+        0.562,
+        0.827,
+        0.58
+      ],
+      "angle": 0,
+      "content": "token ids \\((W) = \\{w_{v1}, w_{v2}, \\dots, w_{v_n}\\}\\)"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.508,
+        0.582,
+        0.789,
+        0.598
+      ],
+      "angle": 0,
+      "content": "positional ids \\((B) = \\{b_1,b_2,\\dots ,b_n\\}\\)"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.522,
+        0.602,
+        0.852,
+        0.62
+      ],
+      "angle": 0,
+      "content": "segment ids \\((G) = \\{g_{seg_1}, g_{seg_2}, \\dots, g_{seg_n}\\}\\)"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.526,
+        0.621,
+        0.843,
+        0.639
+      ],
+      "angle": 0,
+      "content": "column iDs \\((C) = \\{c_{col_1}, c_{col_2}, \\dots, c_{col_n}\\}\\)"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.553,
+        0.643,
+        0.863,
+        0.659
+      ],
+      "angle": 0,
+      "content": "row ids (R) = {row1, row2, ., rown}"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.551,
+        0.661,
+        0.882,
+        0.679
+      ],
+      "angle": 0,
+      "content": "rank ids (Z) = \\{z_{rank_1}, z_{rank_2}, \\dots, z_{rank_n}\\}"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.509,
+        0.694,
+        0.881,
+        0.741
+      ],
+      "angle": 0,
+      "content": "where \\( seg_i \\), \\( col_i \\), \\( row_i \\), \\( rank_i \\) correspond to the segment, column, row, and \\( rank_i \\) for the \\( i \\) ith token, respectively."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.508,
+        0.742,
+        0.885,
+        0.919
+      ],
+      "angle": 0,
+      "content": "As for the model, TAPAS uses BERT's self-attention architecture ( Vaswani et al., 2017) off-the-shelf. Each Transformer layer includes a multi-head self-attention sub-layer, where each token attends to all the tokens. Let the layer input \\( H = [h_1, h_2, \\dots, h_n]^\\top \\in \\mathbb{R}^{n \\times d} \\) corresponding to \\( S \\), where \\( d \\) is the hidden dimension, and \\( h_i \\in \\mathbb{R}^{d \\times 1} \\) is the hidden representation at position \\( i \\). For a single-head self-attention sub-layer, the input \\( H \\) is projected by three matrices \\( W^Q \\in \\mathbb{R}^{d \\times d_K} \\), \\( W^K \\in \\mathbb{R}^{d \\times d_K} \\), and \\( W^V \\in \\mathbb{R}^{d \\times d_V} \\) to the corre"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_demo3_p0002/markdown_1781747319.md"
+}

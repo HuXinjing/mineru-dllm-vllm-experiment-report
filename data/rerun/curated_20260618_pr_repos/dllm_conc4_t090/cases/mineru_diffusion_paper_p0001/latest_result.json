@@ -1,0 +1,170 @@
+{
+  "metrics": {
+    "layout_elapsed": 1.5477140410803258,
+    "extract_elapsed": 1.7752370609669015,
+    "total_elapsed": 3.452845891006291,
+    "num_blocks": 14,
+    "num_extracted_blocks": 14,
+    "markdown_chars": 1822,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>135 058 341 091<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>543 060 647 091<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>652 060 861 075<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>650 077 860 090<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>163 145 795 192<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>163 197 837 216<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>163 221 735 238<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 254 838 482<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>165 500 607 514<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>165 516 533 528<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>167 531 555 543<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>167 547 692 558<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>163 560 302 574<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>494 939 502 950<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion Decoding\n\nHejun Dong*, Junbo Niu*, Bin Wang, Weijun Zeng, Wentao Zhang, Conghui He\n\n\\(^{1}\\)Shanghai Artificial Intelligence Laboratory, OpenDataLab, \\(^{2}\\)Peking University\n\nOptical character recognition (OCR) has evolved from line-level transcription to structured document parsing, requiring models to recover long-form sequences containing layout, tables, and formulas. Despite recent advances in vision-language models, most existing systems rely on autoregressive decoding, which introduces sequential latency and amplifies error propagation in long documents. In this work, we revisit document OCR from an inverse rendering perspective, arguing that left-to-right causal generation is an artifact of serialization rather than an intrinsic property of the task. Motivated by this insight, we propose MinerU-Diffusion, a unified diffusion-based framework that replaces autoregressive sequential decoding with parallel diffusion denoising under visual conditioning. MinerU-Diffusion employs a blockwise diffusion decoder and an uncertainty-driven curriculum learning strategy to enable stable training and efficient long-sequence inference. Extensive experiments demonstrate that MinerU-Diffusion consistently improves robustness while achieving up to \\(3.2\\times\\) faster decoding compared to autoregressive baselines. Evaluations on the proposed Semantic Shuffling benchmark further confirm its reduced dependence on linguistic pri priors and stronger visual OCR capability.\n\n* Equal contribution | Corresponding author‡ Project leader:\n\nCorrespondence: Conghui He, heconghui@pjlab.org.cn\n\nCode: https://github.com/oppendatalab/MinerU-Diffusion\n\nModel: https://huggingface.co/opendatalab/MinU-Diffusion-V1-0320-2.5B\n\nDate: March 23, 2026",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.135,
+        0.058,
+        0.341,
+        0.091
+      ],
+      "angle": 0,
+      "content": "Open dataLab"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.543,
+        0.06,
+        0.647,
+        0.091
+      ],
+      "angle": 0,
+      "content": "1"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.652,
+        0.06,
+        0.861,
+        0.075
+      ],
+      "angle": 0,
+      "content": "上海人工智能实验室"
+    },
+    {
+      "type": "header",
+      "bbox": [
+        0.65,
+        0.077,
+        0.86,
+        0.09
+      ],
+      "angle": 0,
+      "content": "Shanghai Artificial Intelligence Laboratory"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.163,
+        0.145,
+        0.795,
+        0.192
+      ],
+      "angle": 0,
+      "content": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion Decoding"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.163,
+        0.197,
+        0.837,
+        0.216
+      ],
+      "angle": 0,
+      "content": "Hejun Dong*, Junbo Niu*, Bin Wang, Weijun Zeng, Wentao Zhang, Conghui He"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.163,
+        0.221,
+        0.735,
+        0.238
+      ],
+      "angle": 0,
+      "content": "\\(^{1}\\)Shanghai Artificial Intelligence Laboratory, OpenDataLab, \\(^{2}\\)Peking University"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.254,
+        0.838,
+        0.482
+      ],
+      "angle": 0,
+      "content": "Optical character recognition (OCR) has evolved from line-level transcription to structured document parsing, requiring models to recover long-form sequences containing layout, tables, and formulas. Despite recent advances in vision-language models, most existing systems rely on autoregressive decoding, which introduces sequential latency and amplifies error propagation in long documents. In this work, we revisit document OCR from an inverse rendering perspective, arguing that left-to-right causal generation is an artifact of serialization rather than an intrinsic property of the task. Motivated by this insight, we propose MinerU-Diffusion, a unified diffusion-based framework that replaces autoregressive sequential decoding with parallel diffusion denoising under visual conditioning. MinerU-Diffusion employs a blockwise diffusion decoder and an uncertainty-driven curriculum learning strategy to enable stable training and efficient long-sequence inference. Extensive experiments demonstrate that MinerU-Diffusion consistently improves robustness while achieving up to \\(3.2\\times\\) faster decoding compared to autoregressive baselines. Evaluations on the proposed Semantic Shuffling benchmark further confirm its reduced dependence on linguistic pri priors and stronger visual OCR capability."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.165,
+        0.5,
+        0.607,
+        0.514
+      ],
+      "angle": 0,
+      "content": "* Equal contribution | Corresponding author‡ Project leader:"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.165,
+        0.516,
+        0.533,
+        0.528
+      ],
+      "angle": 0,
+      "content": "Correspondence: Conghui He, heconghui@pjlab.org.cn"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.167,
+        0.531,
+        0.555,
+        0.543
+      ],
+      "angle": 0,
+      "content": "Code: https://github.com/oppendatalab/MinerU-Diffusion"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.167,
+        0.547,
+        0.692,
+        0.558
+      ],
+      "angle": 0,
+      "content": "Model: https://huggingface.co/opendatalab/MinU-Diffusion-V1-0320-2.5B"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.163,
+        0.56,
+        0.302,
+        0.574
+      ],
+      "angle": 0,
+      "content": "Date: March 23, 2026"
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.494,
+        0.939,
+        0.502,
+        0.95
+      ],
+      "angle": 0,
+      "content": "1"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_diffusion_paper_p0001/markdown_1781747534.md"
+}

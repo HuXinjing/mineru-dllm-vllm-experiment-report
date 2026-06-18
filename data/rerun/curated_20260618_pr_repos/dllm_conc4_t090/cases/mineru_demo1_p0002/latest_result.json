@@ -1,0 +1,115 @@
+{
+  "metrics": {
+    "layout_elapsed": 0.951218951959163,
+    "extract_elapsed": 1.3310580890392885,
+    "total_elapsed": 2.440755074028857,
+    "num_blocks": 9,
+    "num_extracted_blocks": 8,
+    "markdown_chars": 4081,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>085 094 109 104<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>\n<|box_start|>317 093 692 105<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>087 125 205 137<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>087 156 483 490<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>087 494 483 892<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>528 123 918 356<|box_end|><|ref_start|>image<|ref_end|><|rotate_up|>\n<|box_start|>525 370 922 395<|box_end|><|ref_start|>image_caption<|ref_end|><|rotate_up|>\n<|box_start|>525 410 922 618<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>525 622 922 894<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>",
+  "markdown": "P.N.J. Lane et al. / Journal of Hydrology 310 (2005) 253-265\n\n1. Introduction\n\nWidespread afforestations through plantation establishment on non-forested land represents a potentially significant alteration of catchment evapotranspiration (ET). Using data collated from multiple catchment studies researchers have demonstrated a consistent difference in ET between forests and grass or short crops, and the relationship between ET and rainfall on a mean annual basis (Holmes and Sinclair, 1986; Vertessy and Bessard, 1999; Zhang et al., 1999, 2001). Once annual rainfall exceeds \\(400 - 500~\\mathrm{mm}\\) there is an increasing divergence between forest and grassland ET (Zhang et al., 2001). Research from South Africa in particular has demonstrated flow reduction following afforestation with both pine and eucalypt species (Bosch, 1979; Van Lill et al., 1980; Van Wyk, 1987; Bosch and Von Gadow, 1990; Scott and Smith, 1997; Scott et al., 2000). In regions, where water is an increasingly valuable resource, prediction of the long-term hydrologic impact of afforestation is a prerequisite for the optimal planning of catchment land use.\n\nZhang et al. (1999, 2001) developed simple and easily parameterised models to predict changes in mean annual flows following afforestationstation. However, there is a need to consider the annual flow regime as the relative changes in high and low flows may have considerable site specific and downstream impacts. Sikka et al. (2003) recently showed a change from grassland to Eucalyptus globulusus plantations in India decreased a low flow index by a factor of two during the first rotation (9 years), and by 3.75 during the second rotation, with more subdued in impact on peak flows. The index was defined as the 10 day average flow exceeded \\(95\\%\\) of the time, obtained from analysis of 10-day flow duration curves. Scott and Smith (1997) reported proportionally greater reductions in low flows (75-100th percentiles) than annual flows from South African research catchments under conversions from grass to pine and eucalypt plantations, while Bosch (1979) found the greatest reduction in seasonal flow from the summer wet season. Fahey and Jackson (1997) reported the reduction in peak flows was twice that of total flow and low flows for pine afforestationstation in New Zealand. The generalisations that can be drawn from annual analyses, where processes and hydrologic responses are to a certain extent integrated may not not\n\nFig. 1. Annual flow duration curves of daily flows from Pine Creek, Australia, 1989-2000.\n\napply on a seasonal or shorter scale. Further, the observed impacts of any land use change on flows may be exaggerated or understated depending on the prevailing climate. Observations of flow during extended wet or dry spells, or with high annual variability can obscure the real impacts. Fig. 1 plots annual FDCs over 12 years of plantation growth for one. of the catchments used in this study, Pine Creek. The net change in flow is obscured by rainfall variability; e.g. the greatest change in the FDC is in 1996, with the stream flowing \\(< 20\\%\\) of the time. This may be compared with 2000, where there is substantially higher flows.\n\nThis paper presents the results of a project aimed at quantifying changes in annual flow regime of catchments following plantation establishment. The flow regime is represented by the flow duration curve (FDC). The key assumption was that rainfall and forest age are the principal drivers of evapotranspiration. For any generalisation of response of the FDC to vegetation change, the variation in the annual climate signal must be removed. The time-tested solution to this problem is the paired-catchment (control versus treatment) experiment. The benefits in such studies are manifold: unambiguous measures of trends, insights into the processes driving those trends, excellent opportunities for model parameterisation and validation. However these data are not readily available for the range of treatments and environments required. Consequently, the aims of this project",
+  "blocks": [
+    {
+      "type": "page_number",
+      "bbox": [
+        0.085,
+        0.094,
+        0.109,
+        0.104
+      ],
+      "angle": 0,
+      "content": "254"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.317,
+        0.093,
+        0.692,
+        0.105
+      ],
+      "angle": 0,
+      "content": "P.N.J. Lane et al. / Journal of Hydrology 310 (2005) 253-265"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.087,
+        0.125,
+        0.205,
+        0.137
+      ],
+      "angle": 0,
+      "content": "1. Introduction"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.087,
+        0.156,
+        0.483,
+        0.49
+      ],
+      "angle": 0,
+      "content": "Widespread afforestations through plantation establishment on non-forested land represents a potentially significant alteration of catchment evapotranspiration (ET). Using data collated from multiple catchment studies researchers have demonstrated a consistent difference in ET between forests and grass or short crops, and the relationship between ET and rainfall on a mean annual basis (Holmes and Sinclair, 1986; Vertessy and Bessard, 1999; Zhang et al., 1999, 2001). Once annual rainfall exceeds \\(400 - 500~\\mathrm{mm}\\) there is an increasing divergence between forest and grassland ET (Zhang et al., 2001). Research from South Africa in particular has demonstrated flow reduction following afforestation with both pine and eucalypt species (Bosch, 1979; Van Lill et al., 1980; Van Wyk, 1987; Bosch and Von Gadow, 1990; Scott and Smith, 1997; Scott et al., 2000). In regions, where water is an increasingly valuable resource, prediction of the long-term hydrologic impact of afforestation is a prerequisite for the optimal planning of catchment land use."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.087,
+        0.494,
+        0.483,
+        0.892
+      ],
+      "angle": 0,
+      "content": "Zhang et al. (1999, 2001) developed simple and easily parameterised models to predict changes in mean annual flows following afforestationstation. However, there is a need to consider the annual flow regime as the relative changes in high and low flows may have considerable site specific and downstream impacts. Sikka et al. (2003) recently showed a change from grassland to Eucalyptus globulusus plantations in India decreased a low flow index by a factor of two during the first rotation (9 years), and by 3.75 during the second rotation, with more subdued in impact on peak flows. The index was defined as the 10 day average flow exceeded \\(95\\%\\) of the time, obtained from analysis of 10-day flow duration curves. Scott and Smith (1997) reported proportionally greater reductions in low flows (75-100th percentiles) than annual flows from South African research catchments under conversions from grass to pine and eucalypt plantations, while Bosch (1979) found the greatest reduction in seasonal flow from the summer wet season. Fahey and Jackson (1997) reported the reduction in peak flows was twice that of total flow and low flows for pine afforestationstation in New Zealand. The generalisations that can be drawn from annual analyses, where processes and hydrologic responses are to a certain extent integrated may not not"
+    },
+    {
+      "type": "image",
+      "bbox": [
+        0.528,
+        0.123,
+        0.918,
+        0.356
+      ],
+      "angle": 0,
+      "content": null
+    },
+    {
+      "type": "image_caption",
+      "bbox": [
+        0.525,
+        0.37,
+        0.922,
+        0.395
+      ],
+      "angle": 0,
+      "content": "Fig. 1. Annual flow duration curves of daily flows from Pine Creek, Australia, 1989-2000."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.525,
+        0.41,
+        0.922,
+        0.618
+      ],
+      "angle": 0,
+      "content": "apply on a seasonal or shorter scale. Further, the observed impacts of any land use change on flows may be exaggerated or understated depending on the prevailing climate. Observations of flow during extended wet or dry spells, or with high annual variability can obscure the real impacts. Fig. 1 plots annual FDCs over 12 years of plantation growth for one. of the catchments used in this study, Pine Creek. The net change in flow is obscured by rainfall variability; e.g. the greatest change in the FDC is in 1996, with the stream flowing \\(< 20\\%\\) of the time. This may be compared with 2000, where there is substantially higher flows."
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.525,
+        0.622,
+        0.922,
+        0.894
+      ],
+      "angle": 0,
+      "content": "This paper presents the results of a project aimed at quantifying changes in annual flow regime of catchments following plantation establishment. The flow regime is represented by the flow duration curve (FDC). The key assumption was that rainfall and forest age are the principal drivers of evapotranspiration. For any generalisation of response of the FDC to vegetation change, the variation in the annual climate signal must be removed. The time-tested solution to this problem is the paired-catchment (control versus treatment) experiment. The benefits in such studies are manifold: unambiguous measures of trends, insights into the processes driving those trends, excellent opportunities for model parameterisation and validation. However these data are not readily available for the range of treatments and environments required. Consequently, the aims of this project"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_demo1_p0002/markdown_1781747490.md"
+}

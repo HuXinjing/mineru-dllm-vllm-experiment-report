@@ -1,0 +1,610 @@
+{
+  "metrics": {
+    "layout_elapsed": 4.15146421699319,
+    "extract_elapsed": 3.519664366962388,
+    "total_elapsed": 7.785234718001448,
+    "num_blocks": 54,
+    "num_extracted_blocks": 54,
+    "markdown_chars": 2600,
+    "content_concurrency": 4
+  },
+  "layout_output": "<|box_start|>135 077 840 095<|box_end|><|ref_start|>header<|ref_end|><|rotate_up|>\n<|box_start|>135 123 240 142<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>138 157 862 171<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>136 184 865 198<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>138 213 865 224<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>157 227 862 241<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>159 242 866 256<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>157 258 864 271<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>196 273 866 287<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 289 862 302<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>157 227 866 302<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>139 316 866 329<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>160 331 865 345<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>198 346 865 360<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 362 866 375<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 376 865 390<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 346 866 390<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>159 390 865 405<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>159 405 863 421<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>198 421 864 435<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 436 862 451<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 421 864 451<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>161 451 866 467<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>198 467 865 480<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>198 482 865 496<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>198 497 865 510<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 511 865 525<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>198 526 865 540<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>197 467 865 540<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>161 541 864 556<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>136 569 862 582<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>137 596 862 612<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>162 613 865 627<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 628 866 643<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 643 863 656<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 658 865 672<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 673 863 686<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 687 860 700<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 613 866 700<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>137 714 862 730<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>160 731 864 743<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 745 864 759<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 761 864 775<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 776 864 790<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>160 731 864 790<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>136 803 862 817<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>161 818 865 833<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>161 834 863 848<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>161 818 865 848<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>136 860 866 876<|box_end|><|ref_start|>title<|ref_end|><|rotate_up|>\n<|box_start|>161 876 864 890<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>162 891 862 905<|box_end|><|ref_start|>text<|ref_end|><|rotate_up|>\n<|box_start|>161 876 864 905<|box_end|><|ref_start|>list<|ref_end|><|rotate_up|>\n<|box_start|>493 938 506 951<|box_end|><|ref_start|>page_number<|ref_end|><|rotate_up|>",
+  "markdown": "Contents\n\n1 Introduction 3\n\n2 Related Works 4\n\n3 Method 5\n\n3.1 Problem Formulation: Inverse Rendering via Diffusion 5\n\n3.2 MinerU-Diffusion: Unified Diffusion Architecture for OCR 6\n\n3.3 Two-Stage Curriculum Learning with Uncertainty-Driven Refinement 8\n\n3.3.1 Stage I: Diversity-Driven Foundational Learning 8\n\n3.3.2 Stage II: Uncertainty-Driven Boundary Refinement 8\n\n3.1 Problem Formulation: Inverse Rendering via Diffusion 5  \n3.2 MinerU-Diffusion: Unified Diffusion Architecture for OCR 6  \n3.3 Two-Stage Curriculum Learning with Uncertainty-Driven Refinement 8  \n3.3.1 Stage I: Diversity-Driven Foundational Learning 8  \n3.3.2 Stage II: Uncertainty-Driven Boundary Refinement 8\n\n4 Experiments 9\n\n4.1 Experimental Setups 9\n\n4.1.1 Data 9\n\n4.1.2 Models and Optimization 9\n\n4.1.3 Evaluation 10\n\n4.1.1 Data 9  \n4.1.2 Models and Optimization 9  \n4.1.3 Evaluation 10\n\n4.2 Full-Document Parsing Task Results 10\n\n4.3 Element-Specific Parsing Task Results 11\n\n4.3.1 Table Recognition 11\n\n4.3.2 Formula Recognition 11\n\n4.3.1 Table Recognition 11  \n4.3.2 Formula Recognition 11\n\n4.4 Ablation Study 11\n\n4.4.1 Confidence Threshold vs. Decoding Parallelism 11\n\n4.4.2 Decoding Parallelism vs Accuracy 12\n\n4.4.3 Decoding Strategy Comparisons 13\n\n4.4.4 Full-Atn vs Block-Attn 13\n\n4.4.5 Two-Stage Curriculum Learning 14\n\n4.4.1 Confidence Threshold vs. Decoding Parallelism 11  \n4.4.2 Decoding Parallelism vs Accuracy 12  \n4.4.3 Decoding Strategy Comparisons 13  \n4.4.4 Full-Attn vs Block Attn 13  \n4.4.5 Two-Stage Curriculum Learning 14\n\n4.5 Semantic Shuffle Analysis 14\n\n5 Conclusion 15\n\nA Training Details 20\n\nA.1 Stage-0: Modality Alignment 20\n\nA.2 Stage-1: Large-Scale OCR Adaptation 20\n\nA.3 Stage-2:Hard-Case Specialization 21\n\nA.4 Training Dynamics 21\n\nA.5 Data Augmentation 21\n\nA.6 Practical Notes 21\n\nA.1 Stage-0: Modality Alignment 20  \nA.2 Stage-1: Large-Scale OCR Adaptation 20  \nA.3 Stage-2: Hard-Case Specialization 21  \nA.4 Training Dynamics 21  \nA.5 Data Augmentation 21  \nA.6 Practical Notes 21\n\nB Prompt Templates 22\n\nB.1Layout Detection 23\n\nB.2 Text Recognition 23\n\nB.3 Formula Recognition 23\n\nB.4 Table Recognition 23\n\nB.1 Layout Detection 23  \nB.2 Text Recognition 23  \nB.3 Formula Recognition 23  \nB.4 Table Recognition 23\n\nC Full Attn vs Block-Attn 24\n\nC.1Why Full-Attn Is Inferior 24\n\nC.2 Generation Quality under Length Mismatch 24\n\nC.1 Why Full-Atnn Is Inferior 24  \nC.2 Generation Quality under Length Mismatch 24\n\nD Qualitative Examples 27\n\nD.1 Complete Recognition Examples 27\n\nD.2 Diffusion Decoding Examples 27\n\nD.1 Complete Recognition Examples 27\nD.2 Diffusion Decoding Examples 27",
+  "blocks": [
+    {
+      "type": "header",
+      "bbox": [
+        0.135,
+        0.077,
+        0.84,
+        0.095
+      ],
+      "angle": 0,
+      "content": "MinerU-Diffusion: Rethinking Document OCR as Inverse Rendering via Diffusion Decoding"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.135,
+        0.123,
+        0.24,
+        0.142
+      ],
+      "angle": 0,
+      "content": "Contents"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.138,
+        0.157,
+        0.862,
+        0.171
+      ],
+      "angle": 0,
+      "content": "1 Introduction 3"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.136,
+        0.184,
+        0.865,
+        0.198
+      ],
+      "angle": 0,
+      "content": "2 Related Works 4"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.138,
+        0.213,
+        0.865,
+        0.224
+      ],
+      "angle": 0,
+      "content": "3 Method 5"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.157,
+        0.227,
+        0.862,
+        0.241
+      ],
+      "angle": 0,
+      "content": "3.1 Problem Formulation: Inverse Rendering via Diffusion 5"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.159,
+        0.242,
+        0.866,
+        0.256
+      ],
+      "angle": 0,
+      "content": "3.2 MinerU-Diffusion: Unified Diffusion Architecture for OCR 6"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.157,
+        0.258,
+        0.864,
+        0.271
+      ],
+      "angle": 0,
+      "content": "3.3 Two-Stage Curriculum Learning with Uncertainty-Driven Refinement 8"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.196,
+        0.273,
+        0.866,
+        0.287
+      ],
+      "angle": 0,
+      "content": "3.3.1 Stage I: Diversity-Driven Foundational Learning 8"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.197,
+        0.289,
+        0.862,
+        0.302
+      ],
+      "angle": 0,
+      "content": "3.3.2 Stage II: Uncertainty-Driven Boundary Refinement 8"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.157,
+        0.227,
+        0.866,
+        0.302
+      ],
+      "angle": 0,
+      "content": "3.1 Problem Formulation: Inverse Rendering via Diffusion 5  \n3.2 MinerU-Diffusion: Unified Diffusion Architecture for OCR 6  \n3.3 Two-Stage Curriculum Learning with Uncertainty-Driven Refinement 8  \n3.3.1 Stage I: Diversity-Driven Foundational Learning 8  \n3.3.2 Stage II: Uncertainty-Driven Boundary Refinement 8"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.139,
+        0.316,
+        0.866,
+        0.329
+      ],
+      "angle": 0,
+      "content": "4 Experiments 9"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.331,
+        0.865,
+        0.345
+      ],
+      "angle": 0,
+      "content": "4.1 Experimental Setups 9"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.198,
+        0.346,
+        0.865,
+        0.36
+      ],
+      "angle": 0,
+      "content": "4.1.1 Data 9"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.197,
+        0.362,
+        0.866,
+        0.375
+      ],
+      "angle": 0,
+      "content": "4.1.2 Models and Optimization 9"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.197,
+        0.376,
+        0.865,
+        0.39
+      ],
+      "angle": 0,
+      "content": "4.1.3 Evaluation 10"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.197,
+        0.346,
+        0.866,
+        0.39
+      ],
+      "angle": 0,
+      "content": "4.1.1 Data 9  \n4.1.2 Models and Optimization 9  \n4.1.3 Evaluation 10"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.159,
+        0.39,
+        0.865,
+        0.405
+      ],
+      "angle": 0,
+      "content": "4.2 Full-Document Parsing Task Results 10"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.159,
+        0.405,
+        0.863,
+        0.421
+      ],
+      "angle": 0,
+      "content": "4.3 Element-Specific Parsing Task Results 11"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.198,
+        0.421,
+        0.864,
+        0.435
+      ],
+      "angle": 0,
+      "content": "4.3.1 Table Recognition 11"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.197,
+        0.436,
+        0.862,
+        0.451
+      ],
+      "angle": 0,
+      "content": "4.3.2 Formula Recognition 11"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.197,
+        0.421,
+        0.864,
+        0.451
+      ],
+      "angle": 0,
+      "content": "4.3.1 Table Recognition 11  \n4.3.2 Formula Recognition 11"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.161,
+        0.451,
+        0.866,
+        0.467
+      ],
+      "angle": 0,
+      "content": "4.4 Ablation Study 11"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.198,
+        0.467,
+        0.865,
+        0.48
+      ],
+      "angle": 0,
+      "content": "4.4.1 Confidence Threshold vs. Decoding Parallelism 11"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.198,
+        0.482,
+        0.865,
+        0.496
+      ],
+      "angle": 0,
+      "content": "4.4.2 Decoding Parallelism vs Accuracy 12"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.198,
+        0.497,
+        0.865,
+        0.51
+      ],
+      "angle": 0,
+      "content": "4.4.3 Decoding Strategy Comparisons 13"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.197,
+        0.511,
+        0.865,
+        0.525
+      ],
+      "angle": 0,
+      "content": "4.4.4 Full-Atn vs Block-Attn 13"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.198,
+        0.526,
+        0.865,
+        0.54
+      ],
+      "angle": 0,
+      "content": "4.4.5 Two-Stage Curriculum Learning 14"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.197,
+        0.467,
+        0.865,
+        0.54
+      ],
+      "angle": 0,
+      "content": "4.4.1 Confidence Threshold vs. Decoding Parallelism 11  \n4.4.2 Decoding Parallelism vs Accuracy 12  \n4.4.3 Decoding Strategy Comparisons 13  \n4.4.4 Full-Attn vs Block Attn 13  \n4.4.5 Two-Stage Curriculum Learning 14"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.161,
+        0.541,
+        0.864,
+        0.556
+      ],
+      "angle": 0,
+      "content": "4.5 Semantic Shuffle Analysis 14"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.136,
+        0.569,
+        0.862,
+        0.582
+      ],
+      "angle": 0,
+      "content": "5 Conclusion 15"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.137,
+        0.596,
+        0.862,
+        0.612
+      ],
+      "angle": 0,
+      "content": "A Training Details 20"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.162,
+        0.613,
+        0.865,
+        0.627
+      ],
+      "angle": 0,
+      "content": "A.1 Stage-0: Modality Alignment 20"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.628,
+        0.866,
+        0.643
+      ],
+      "angle": 0,
+      "content": "A.2 Stage-1: Large-Scale OCR Adaptation 20"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.643,
+        0.863,
+        0.656
+      ],
+      "angle": 0,
+      "content": "A.3 Stage-2:Hard-Case Specialization 21"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.658,
+        0.865,
+        0.672
+      ],
+      "angle": 0,
+      "content": "A.4 Training Dynamics 21"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.673,
+        0.863,
+        0.686
+      ],
+      "angle": 0,
+      "content": "A.5 Data Augmentation 21"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.687,
+        0.86,
+        0.7
+      ],
+      "angle": 0,
+      "content": "A.6 Practical Notes 21"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.16,
+        0.613,
+        0.866,
+        0.7
+      ],
+      "angle": 0,
+      "content": "A.1 Stage-0: Modality Alignment 20  \nA.2 Stage-1: Large-Scale OCR Adaptation 20  \nA.3 Stage-2: Hard-Case Specialization 21  \nA.4 Training Dynamics 21  \nA.5 Data Augmentation 21  \nA.6 Practical Notes 21"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.137,
+        0.714,
+        0.862,
+        0.73
+      ],
+      "angle": 0,
+      "content": "B Prompt Templates 22"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.731,
+        0.864,
+        0.743
+      ],
+      "angle": 0,
+      "content": "B.1Layout Detection 23"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.745,
+        0.864,
+        0.759
+      ],
+      "angle": 0,
+      "content": "B.2 Text Recognition 23"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.761,
+        0.864,
+        0.775
+      ],
+      "angle": 0,
+      "content": "B.3 Formula Recognition 23"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.16,
+        0.776,
+        0.864,
+        0.79
+      ],
+      "angle": 0,
+      "content": "B.4 Table Recognition 23"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.16,
+        0.731,
+        0.864,
+        0.79
+      ],
+      "angle": 0,
+      "content": "B.1 Layout Detection 23  \nB.2 Text Recognition 23  \nB.3 Formula Recognition 23  \nB.4 Table Recognition 23"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.136,
+        0.803,
+        0.862,
+        0.817
+      ],
+      "angle": 0,
+      "content": "C Full Attn vs Block-Attn 24"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.161,
+        0.818,
+        0.865,
+        0.833
+      ],
+      "angle": 0,
+      "content": "C.1Why Full-Attn Is Inferior 24"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.161,
+        0.834,
+        0.863,
+        0.848
+      ],
+      "angle": 0,
+      "content": "C.2 Generation Quality under Length Mismatch 24"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.161,
+        0.818,
+        0.865,
+        0.848
+      ],
+      "angle": 0,
+      "content": "C.1 Why Full-Atnn Is Inferior 24  \nC.2 Generation Quality under Length Mismatch 24"
+    },
+    {
+      "type": "title",
+      "bbox": [
+        0.136,
+        0.86,
+        0.866,
+        0.876
+      ],
+      "angle": 0,
+      "content": "D Qualitative Examples 27"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.161,
+        0.876,
+        0.864,
+        0.89
+      ],
+      "angle": 0,
+      "content": "D.1 Complete Recognition Examples 27"
+    },
+    {
+      "type": "text",
+      "bbox": [
+        0.162,
+        0.891,
+        0.862,
+        0.905
+      ],
+      "angle": 0,
+      "content": "D.2 Diffusion Decoding Examples 27"
+    },
+    {
+      "type": "list",
+      "bbox": [
+        0.161,
+        0.876,
+        0.864,
+        0.905
+      ],
+      "angle": 0,
+      "content": "D.1 Complete Recognition Examples 27\nD.2 Diffusion Decoding Examples 27"
+    },
+    {
+      "type": "page_number",
+      "bbox": [
+        0.493,
+        0.938,
+        0.506,
+        0.951
+      ],
+      "angle": 0,
+      "content": "2"
+    }
+  ],
+  "markdown_path": "<REPORT_REPO>/data/rerun/curated_20260618_pr_repos/dllm_conc4_t090/cases/mineru_diffusion_paper_p0002/markdown_1781747542.md"
+}
